@@ -48,6 +48,7 @@ const App: React.FC = () => {
   const [businessDetails, setBusinessDetails] = useState<BusinessDetails>(initialBusinessDetails);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showLedgerModal, setShowLedgerModal] = useState(false);
   const [activeView, setActiveView] = useState<View>('dashboard');
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
 
@@ -161,14 +162,22 @@ const App: React.FC = () => {
   }, [currentUser, activeView]);
 
 
-  const NavItem = ({ view, label, icon, mobile = false }: { view: View, label: string, icon: React.ReactElement, mobile?: boolean }) => {
+  const NavItem = ({ view, label, icon, mobile = false, onClick }: { view: View, label: string, icon: React.ReactElement, mobile?: boolean, onClick?: () => void }) => {
     if (!hasPermission(view)) return null;
     
-    const isActive = activeView === view;
+    const isActive = activeView === view && !onClick;
+    const handleClick = () => {
+        if (onClick) {
+            onClick();
+        } else {
+            setActiveView(view);
+        }
+    };
+
     if (mobile) {
          return (
              <button
-              onClick={() => setActiveView(view)}
+              onClick={handleClick}
               className={`flex flex-col items-center justify-center w-full rounded-md py-2 px-1 text-xs font-medium transition-colors ${isActive ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:bg-gray-100'}`}
             >
               {icon}
@@ -178,7 +187,7 @@ const App: React.FC = () => {
     }
     return (
         <button
-            onClick={() => setActiveView(view)}
+            onClick={handleClick}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${isActive ? 'bg-primary-100 text-primary-700 font-bold' : 'text-gray-600 hover:bg-gray-100'}`}
         >
             {icon}
@@ -274,7 +283,7 @@ const App: React.FC = () => {
             <NavItem view="customers" label="Khách Hàng" icon={<UsersIcon />} />
             <NavItem view="suppliers" label="Nhà Cung Cấp" icon={<TruckIcon />} />
             <NavItem view="products" label="Hàng Hóa" icon={<CubeIcon />} />
-            <NavItem view="ledger" label="Sổ Sách" icon={<BookOpenIcon />} />
+            <NavItem view="ledger" label="Sổ Sách" icon={<BookOpenIcon />} onClick={() => setShowLedgerModal(true)} />
             <NavItem view="reports" label="Báo Cáo" icon={<DocumentReportIcon />} />
             <NavItem view="employees" label="Nhân Viên" icon={<IdentificationIcon />} />
              
@@ -332,6 +341,33 @@ const App: React.FC = () => {
           suppliers={suppliers}
           products={products}
         />
+      )}
+
+      {/* Ledger Popup Modal */}
+      {showLedgerModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white w-full h-full max-w-[95vw] max-h-[90vh] rounded-xl shadow-2xl overflow-hidden flex flex-col">
+                 <div className="flex justify-between items-center p-4 border-b bg-gray-50">
+                    <h2 className="text-xl font-bold text-primary-700 flex items-center gap-2">
+                        <BookOpenIcon />
+                        Sổ Sách Kế Toán
+                    </h2>
+                    <button onClick={() => setShowLedgerModal(false)} className="text-gray-500 hover:text-red-500 text-2xl transition-colors">&times;</button>
+                 </div>
+                 <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
+                    <LedgerView 
+                        transactions={transactions} 
+                        products={products} 
+                        customers={customers} 
+                        suppliers={suppliers} 
+                        onAddTransaction={addTransaction} 
+                        onUpdateTransaction={updateTransaction} 
+                        onDeleteTransaction={deleteTransaction} 
+                        onAddProduct={productOps.add} 
+                    />
+                 </div>
+            </div>
+        </div>
       )}
     </div>
   );
