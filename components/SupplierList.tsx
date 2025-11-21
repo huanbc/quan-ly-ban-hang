@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Supplier, Transaction } from '../types';
 import { PlusIcon, DownloadIcon } from '../constants';
 import AddEditSupplierModal from './AddEditSupplierModal';
@@ -15,6 +15,18 @@ interface Props {
 const SupplierList: React.FC<Props> = ({ suppliers, transactions, onAdd, onUpdate, onDelete }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredSuppliers = useMemo(() => {
+    if (!searchTerm) {
+      return suppliers;
+    }
+    const lowercasedFilter = searchTerm.toLowerCase();
+    return suppliers.filter(supplier =>
+      supplier.name.toLowerCase().includes(lowercasedFilter) ||
+      (supplier.phone && supplier.phone.toLowerCase().includes(lowercasedFilter))
+    );
+  }, [suppliers, searchTerm]);
 
   const handleOpenModal = (supplier: Supplier | null = null) => {
     setEditingSupplier(supplier);
@@ -42,7 +54,7 @@ const SupplierList: React.FC<Props> = ({ suppliers, transactions, onAdd, onUpdat
 
   const handleExport = () => {
     const headers = ["Tên Nhà Cung Cấp", "Phân Loại", "Mã Số Thuế", "Số Điện Thoại", "Địa Chỉ", "Ngân Hàng", "Số Tài Khoản", "Công Nợ"];
-    const data = suppliers.map(s => [
+    const data = filteredSuppliers.map(s => [
       s.name,
       s.classification || '',
       s.taxId || '',
@@ -58,21 +70,28 @@ const SupplierList: React.FC<Props> = ({ suppliers, transactions, onAdd, onUpdat
   return (
     <>
       <div className="bg-white p-4 sm:p-6 rounded-xl shadow-lg">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-700 mb-4 sm:mb-0">Danh Sách Nhà Cung Cấp</h2>
-          <div className="flex items-center space-x-2">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+          <h2 className="text-2xl font-bold text-gray-700">Danh Sách Nhà Cung Cấp</h2>
+           <div className="flex items-center space-x-2 w-full sm:w-auto">
+             <input
+                type="text"
+                placeholder="Tìm theo tên hoặc SĐT..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full sm:w-48 p-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+            />
             <button onClick={handleExport} className="flex items-center space-x-2 text-sm bg-green-600 text-white px-3 py-2 rounded-lg shadow hover:bg-green-700 transition-colors">
               <DownloadIcon />
-              <span>Xuất Excel</span>
+              <span className="hidden sm:inline">Xuất Excel</span>
             </button>
             <button onClick={() => handleOpenModal()} className="flex items-center space-x-2 bg-primary-600 text-white px-4 py-2 rounded-lg shadow hover:bg-primary-700 transition-colors">
               <PlusIcon />
-              <span>Thêm Mới</span>
+              <span className="hidden sm:inline">Thêm Mới</span>
             </button>
           </div>
         </div>
         <div className="overflow-x-auto">
-          {suppliers.length > 0 ? (
+          {filteredSuppliers.length > 0 ? (
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -85,7 +104,7 @@ const SupplierList: React.FC<Props> = ({ suppliers, transactions, onAdd, onUpdat
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {suppliers.map(supplier => {
+                {filteredSuppliers.map(supplier => {
                   const debt = calculateDebt(supplier.id);
                   return (
                     <tr key={supplier.id} className="hover:bg-gray-50">
@@ -115,7 +134,7 @@ const SupplierList: React.FC<Props> = ({ suppliers, transactions, onAdd, onUpdat
             </table>
           ) : (
             <div className="text-center py-12 text-gray-500">
-              <p>Chưa có nhà cung cấp nào.</p>
+              <p>{searchTerm ? 'Không tìm thấy nhà cung cấp nào.' : 'Chưa có nhà cung cấp nào.'}</p>
             </div>
           )}
         </div>

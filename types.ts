@@ -42,6 +42,8 @@ export interface Transaction {
   supplierId?: string; // Link to a supplier
   lineItems?: LineItem[];
   paymentMethod?: 'cash' | 'bank'; // 'cash' for S6-HKD, 'bank' for S7-HKD
+  discountAmount?: number;
+  promotionCode?: string;
 }
 
 export interface Customer {
@@ -79,4 +81,15 @@ export interface Supplier {
   budgetCode?: string;
   bankName?: string;
   bankAccountNumber?: string;
+}
+
+export interface BusinessDetails {
+  taxpayerName: string;
+  storeName: string;
+  bankAccount: string;
+  taxId: string;
+  businessLines: { code: string; name: string }[];
+  address: string;
+  phone: string;
+  email: string;
 }

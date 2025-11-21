@@ -1,11 +1,13 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Product, Supplier, Transaction, TransactionType } from '../types';
-import { TrashIcon } from '../constants';
+import { TrashIcon, PlusIcon } from '../constants';
+import AddEditSupplierModal from './AddEditSupplierModal';
 
 interface PurchaseViewProps {
   products: Product[];
   suppliers: Supplier[];
   onAddTransaction: (transaction: Omit<Transaction, 'id'>) => void;
+  onAddSupplier: (supplier: Omit<Supplier, 'id'>, callback?: (newSupplier: Supplier) => void) => void;
 }
 
 interface OrderItem {
@@ -13,11 +15,58 @@ interface OrderItem {
   quantity: number;
 }
 
-const PurchaseView: React.FC<PurchaseViewProps> = ({ products, suppliers, onAddTransaction }) => {
+const PurchaseView: React.FC<PurchaseViewProps> = ({ products, suppliers, onAddTransaction, onAddSupplier }) => {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank'>('cash');
+
+  const [isAddSupplierModalOpen, setIsAddSupplierModalOpen] = useState(false);
+  const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
+  const [isSupplierDropdownOpen, setIsSupplierDropdownOpen] = useState(false);
+  const supplierSearchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (supplierSearchRef.current && !supplierSearchRef.current.contains(event.target as Node)) {
+        setIsSupplierDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [supplierSearchRef]);
+
+  const filteredSuppliers = useMemo(() => {
+    if (!supplierSearchTerm) return suppliers;
+    return suppliers.filter(s => s.name.toLowerCase().includes(supplierSearchTerm.toLowerCase()));
+  }, [suppliers, supplierSearchTerm]);
+
+  const handleSelectSupplier = (supplier: Supplier) => {
+    setSelectedSupplierId(supplier.id);
+    setSupplierSearchTerm(supplier.name);
+    setIsSupplierDropdownOpen(false);
+  };
+
+  const handleAddNewSupplierClick = () => {
+    setIsSupplierDropdownOpen(false);
+    setIsAddSupplierModalOpen(true);
+  };
+
+  const handleSaveNewSupplier = (supplierData: Omit<Supplier, 'id'>) => {
+    onAddSupplier(supplierData, (newSupplier) => {
+      setSelectedSupplierId(newSupplier.id);
+      setSupplierSearchTerm(newSupplier.name);
+    });
+    setIsAddSupplierModalOpen(false);
+  };
+  
+  const handleClearSupplier = () => {
+    setSelectedSupplierId('');
+    setSupplierSearchTerm('');
+  };
+
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
@@ -86,10 +135,12 @@ const PurchaseView: React.FC<PurchaseViewProps> = ({ products, suppliers, onAddT
 
     setOrderItems([]);
     setSelectedSupplierId('');
+    setSupplierSearchTerm('');
     alert("Tạo phiếu nhập hàng thành công!");
   };
 
   return (
+    <>
     <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-8rem)]">
       {/* Left side - Product List */}
       <div className="flex-1 lg:w-3/5 bg-white p-4 rounded-xl shadow-lg flex flex-col">
@@ -128,17 +179,53 @@ const PurchaseView: React.FC<PurchaseViewProps> = ({ products, suppliers, onAddT
       <div className="lg:w-2/5 bg-white p-4 rounded-xl shadow-lg flex flex-col">
         <h2 className="text-xl font-bold text-gray-700 mb-4 pb-2 border-b">Phiếu Nhập Hàng</h2>
         
-        <div className="mb-4">
-            <label htmlFor="supplier" className="block text-sm font-medium text-gray-700 mb-1">Nhà cung cấp</label>
-            <select 
-                id="supplier" 
-                value={selectedSupplierId} 
-                onChange={e => setSelectedSupplierId(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
-            >
-              <option value="">-- Chọn nhà cung cấp --</option>
-              {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
+        <div className="mb-4" ref={supplierSearchRef}>
+          <label htmlFor="supplier-search" className="block text-sm font-medium text-gray-700 mb-1">Nhà cung cấp</label>
+          <div className="relative">
+            <input
+              id="supplier-search"
+              type="text"
+              value={supplierSearchTerm}
+              onChange={(e) => {
+                setSupplierSearchTerm(e.target.value);
+                if (selectedSupplierId) setSelectedSupplierId('');
+                setIsSupplierDropdownOpen(true);
+              }}
+              onFocus={() => setIsSupplierDropdownOpen(true)}
+              placeholder="Tìm hoặc thêm mới nhà cung cấp..."
+              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+              autoComplete="off"
+            />
+            {selectedSupplierId && (
+              <button
+                onClick={handleClearSupplier}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                aria-label="Xóa nhà cung cấp đã chọn"
+              >
+                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"></path></svg>
+              </button>
+            )}
+            {isSupplierDropdownOpen && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {filteredSuppliers.map(supplier => (
+                  <button
+                    key={supplier.id}
+                    onClick={() => handleSelectSupplier(supplier)}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  >
+                    {supplier.name}
+                  </button>
+                ))}
+                <button
+                  onClick={handleAddNewSupplierClick}
+                  className="flex items-center space-x-2 w-full text-left px-4 py-2 text-sm font-semibold text-primary-600 bg-primary-50 hover:bg-primary-100"
+                >
+                  <PlusIcon />
+                  <span>Thêm mới nhà cung cấp "{supplierSearchTerm}"</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -195,6 +282,14 @@ const PurchaseView: React.FC<PurchaseViewProps> = ({ products, suppliers, onAddT
         </div>
       </div>
     </div>
+    {isAddSupplierModalOpen && (
+        <AddEditSupplierModal
+          onClose={() => setIsAddSupplierModalOpen(false)}
+          onSave={handleSaveNewSupplier}
+          supplier={null}
+        />
+    )}
+    </>
   );
 };
 

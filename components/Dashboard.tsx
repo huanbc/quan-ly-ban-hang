@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { Transaction, TransactionType, Customer, Supplier, Employee, UserRole } from '../types';
+import { Transaction, TransactionType, Customer, Supplier, Employee, UserRole, BusinessDetails } from '../types';
 import StatCard from './StatCard';
 import SummaryChart from './SummaryChart';
 import BusinessInfo from './BusinessInfo';
@@ -10,9 +10,11 @@ interface DashboardProps {
   customers: Customer[];
   suppliers: Supplier[];
   currentUser: Employee;
+  businessDetails: BusinessDetails;
+  onUpdateBusinessDetails: (details: BusinessDetails) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ transactions, customers, suppliers, currentUser }) => {
+const Dashboard: React.FC<DashboardProps> = ({ transactions, customers, suppliers, currentUser, businessDetails, onUpdateBusinessDetails }) => {
   const { totalIncome, totalExpense, balance, totalReceivable, totalPayable } = useMemo(() => {
     let totalIncome = 0;
     let totalExpense = 0;
@@ -61,7 +63,7 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, customers, supplier
 
   return (
     <div className="space-y-8">
-      <BusinessInfo />
+      <BusinessInfo details={businessDetails} onUpdate={onUpdateBusinessDetails} />
       <div>
         <h2 className="text-2xl font-bold text-gray-700 mb-4">Tổng Quan Tài Chính</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6">

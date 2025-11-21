@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+
+import React, { useState, useMemo, useEffect } from 'react';
 import { Transaction, TransactionType, Customer, Supplier, Product, LineItem } from '../types';
 import { INCOME_CATEGORIES, EXPENSE_CATEGORIES, TrashIcon } from '../constants';
 import { formatCurrency } from '../utils';
@@ -6,12 +7,14 @@ import { formatCurrency } from '../utils';
 interface AddTransactionModalProps {
   onClose: () => void;
   onAddTransaction: (transaction: Omit<Transaction, 'id'>) => void;
+  onUpdateTransaction?: (transaction: Transaction) => void;
+  transaction?: Transaction | null;
   customers: Customer[];
   suppliers: Supplier[];
   products: Product[];
 }
 
-const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ onClose, onAddTransaction, customers, suppliers, products }) => {
+const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ onClose, onAddTransaction, onUpdateTransaction, transaction, customers, suppliers, products }) => {
   const [type, setType] = useState<TransactionType>(TransactionType.EXPENSE);
   const [amount, setAmount] = useState<string>('');
   const [description, setDescription] = useState('');
@@ -29,6 +32,22 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ onClose, onAd
   const [currentPrice, setCurrentPrice] = useState('');
 
   const productMap = useMemo(() => new Map(products.map(p => [p.id, p])), [products]);
+
+  useEffect(() => {
+    if (transaction) {
+      setType(transaction.type);
+      setAmount(String(transaction.amount));
+      setDescription(transaction.description);
+      setCategory(transaction.category);
+      setDate(transaction.date);
+      setCustomerId(transaction.customerId || '');
+      setSupplierId(transaction.supplierId || '');
+      setPaymentMethod(transaction.paymentMethod || 'cash');
+      if (transaction.lineItems) {
+        setLineItems(transaction.lineItems);
+      }
+    }
+  }, [transaction]);
 
   const handleTypeChange = (newType: TransactionType) => {
     setType(newType);
@@ -96,7 +115,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ onClose, onAd
     }
 
 
-    const transactionData: Omit<Transaction, 'id'> = {
+    const transactionData: any = {
       amount: finalAmount,
       description,
       category,
@@ -109,7 +128,11 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ onClose, onAd
     if (customerId) transactionData.customerId = customerId;
     if (supplierId) transactionData.supplierId = supplierId;
 
-    onAddTransaction(transactionData);
+    if (transaction && onUpdateTransaction) {
+        onUpdateTransaction({ ...transactionData, id: transaction.id });
+    } else {
+        onAddTransaction(transactionData);
+    }
     onClose();
   };
   
@@ -139,7 +162,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ onClose, onAd
         <form onSubmit={handleSubmit}>
           <div className="p-6 max-h-[80vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-gray-800">Thêm Giao Dịch Mới</h3>
+              <h3 className="text-xl font-bold text-gray-800">{transaction ? 'Chỉnh Sửa Giao Dịch' : 'Thêm Giao Dịch Mới'}</h3>
               <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-3xl leading-none">&times;</button>
             </div>
             
@@ -298,7 +321,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ onClose, onAd
               type="submit"
               className="px-4 py-2 bg-primary-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
             >
-              Lưu Giao Dịch
+              {transaction ? 'Cập Nhật' : 'Lưu Giao Dịch'}
             </button>
           </div>
         </form>
