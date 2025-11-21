@@ -13,6 +13,7 @@ import ReportsView from './components/ReportsView';
 import LedgerView from './components/LedgerView';
 import AddTransactionModal from './components/AddTransactionModal';
 import { PlusIcon, ChartIcon, ListIcon, UsersIcon, CubeIcon, TruckIcon, ShoppingCartIcon, DocumentReportIcon, BookOpenIcon, IdentificationIcon, ArchiveBoxArrowDownIcon } from './constants';
+import { generateId } from './utils';
 
 type View = 'dashboard' | 'transactions' | 'customers' | 'products' | 'suppliers' | 'sales' | 'purchase' | 'reports' | 'ledger' | 'employees';
 
@@ -86,7 +87,7 @@ const App: React.FC = () => {
   useEffect(() => {
     // Initialize default admin if no employees exist
     if (employees.length === 0) {
-      const admin: Employee = { id: crypto.randomUUID(), name: 'Admin', role: UserRole.ADMIN };
+      const admin: Employee = { id: generateId(), name: 'Admin', role: UserRole.ADMIN };
       setEmployees([admin]);
       setCurrentUser(admin);
     } else if (!currentUser) {
@@ -97,7 +98,7 @@ const App: React.FC = () => {
 
 
   const addTransaction = (transaction: Omit<Transaction, 'id'>) => {
-    const newTransaction: Transaction = { ...transaction, id: crypto.randomUUID() };
+    const newTransaction: Transaction = { ...transaction, id: generateId() };
     setTransactions(prev => [...prev, newTransaction].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
   };
   
@@ -109,14 +110,14 @@ const App: React.FC = () => {
 
   const crudOperations = <T extends {id: string}>(state: T[], setState: React.Dispatch<React.SetStateAction<T[]>>) => ({
     add: (item: Omit<T, 'id'>, callback?: (newItem: T) => void) => {
-      const newItem = { ...item, id: crypto.randomUUID() } as T;
+      const newItem = { ...item, id: generateId() } as T;
       setState(prev => [...prev, newItem]);
       if (callback) {
         callback(newItem);
       }
     },
     batchAdd: (items: Omit<T, 'id'>[]) => {
-      const newItems = items.map(item => ({ ...item, id: crypto.randomUUID() })) as T[];
+      const newItems = items.map(item => ({ ...item, id: generateId() })) as T[];
       setState(prev => [...prev, ...newItems]);
     },
     update: (updatedItem: T) => {
