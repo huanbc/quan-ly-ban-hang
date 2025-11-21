@@ -4,7 +4,17 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
-    return {
+    return {b// THÊM DÒNG NÀY:
+      base: '/quan-ly-ban-hang/', 
+      
+      server: {
+        port: 3000,
+        host: '0.0.0.0',
+      },
+      plugins: [react()],
+      // ... (các cấu hình khác)
+      },
+      plugins: [react()],
       server: {
         port: 3000,
         host: '0.0.0.0',
