@@ -231,7 +231,7 @@ const App: React.FC = () => {
       case 'products': return <ProductList products={products} onAdd={productOps.add} onUpdate={productOps.update} onDelete={productOps.delete} onBatchAdd={productOps.batchAdd} transactions={transactions} suppliers={suppliers} />;
       case 'suppliers': return <SupplierList suppliers={suppliers} transactions={transactions} onAdd={supplierOps.add} onUpdate={supplierOps.update} onDelete={supplierOps.delete} />;
       case 'reports': return <ReportsView transactions={transactions} customers={customers} suppliers={suppliers} products={products} currentUser={currentUser}/>;
-      case 'ledger': return <LedgerView transactions={transactions} products={products} onAddTransaction={addTransaction} onUpdateTransaction={updateTransaction} onDeleteTransaction={deleteTransaction} onAddProduct={productOps.add} />;
+      case 'ledger': return <LedgerView transactions={transactions} products={products} customers={customers} suppliers={suppliers} onAddTransaction={addTransaction} onUpdateTransaction={updateTransaction} onDeleteTransaction={deleteTransaction} onAddProduct={productOps.add} />;
       case 'employees': return <EmployeeList employees={employees} onAdd={employeeOps.add} onUpdate={employeeOps.update} onDelete={employeeOps.delete} />;
       default: return <Dashboard transactions={transactions} customers={customers} suppliers={suppliers} currentUser={currentUser} businessDetails={businessDetails} onUpdateBusinessDetails={setBusinessDetails} />;
     }

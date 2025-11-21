@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Transaction, Product, TaxCategory, TransactionType } from '../types';
+import { Transaction, Product, TaxCategory, TransactionType, Customer, Supplier } from '../types';
 import { exportToCsv, formatCurrency, formatDate } from '../utils';
 import { DownloadIcon, PencilIcon, TrashIcon } from '../constants';
 import OCRTransactionModal from './OCRTransactionModal';
@@ -9,6 +9,8 @@ import AddTransactionModal from './AddTransactionModal';
 interface LedgerViewProps {
   transactions: Transaction[];
   products: Product[];
+  customers: Customer[];
+  suppliers: Supplier[];
   onAddTransaction: (transaction: Omit<Transaction, 'id'>) => void;
   onUpdateTransaction: (transaction: Transaction) => void;
   onDeleteTransaction: (id: string) => void;
@@ -17,7 +19,7 @@ interface LedgerViewProps {
 
 type LedgerType = 'revenue' | 'inventory' | 'expense' | 'tax' | 'payroll' | 'cash' | 'bank';
 
-const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onAddProduct }) => {
+const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, customers, suppliers, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onAddProduct }) => {
   const [activeLedger, setActiveLedger] = useState<LedgerType>('revenue');
   const [year, setYear] = useState(new Date().getFullYear());
   const [selectedInventoryProduct, setSelectedInventoryProduct] = useState<string>('');
@@ -1064,16 +1066,11 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, onAddTr
       {editingTransaction && (
         <AddTransactionModal
             onClose={() => setEditingTransaction(null)}
-            onAddTransaction={onAddTransaction} // Fallback, though not used in edit mode
+            onAddTransaction={onAddTransaction}
             onUpdateTransaction={onUpdateTransaction}
             transaction={editingTransaction}
-            customers={[]} // Pass empty or fetch if needed, but for simple edit logic might be fine or pass full lists if available in LedgerView props which they aren't currently. 
-            // Wait, LedgerView doesn't have customers/suppliers. 
-            // To fully support editing with customer/supplier selection, LedgerView needs those props.
-            // However, the prompt asked for "Allow editing info", basic info is in Transaction.
-            // Ideally I should pass customers/suppliers to LedgerView.
-            // Let's verify if I can easily pass them. Yes, App.tsx has them.
-            suppliers={[]} 
+            customers={customers}
+            suppliers={suppliers}
             products={products}
         />
       )}

@@ -85,13 +85,19 @@ const OCRTransactionModal: React.FC<OCRTransactionModalProps> = ({ onClose, onAd
           }
         });
         
+        // Correct usage: response.text is a property, NOT a function.
         const text = response.text;
         if (text) {
-            const data = JSON.parse(text);
-            if (data.date) setDate(data.date);
-            if (data.description) setDescription(data.description);
-            if (data.totalAmount) setAmount(String(data.totalAmount));
-            if (data.invoiceNumber) setInvoiceNumber(data.invoiceNumber);
+            try {
+                const data = JSON.parse(text);
+                if (data.date) setDate(data.date);
+                if (data.description) setDescription(data.description);
+                if (data.totalAmount) setAmount(String(data.totalAmount));
+                if (data.invoiceNumber) setInvoiceNumber(data.invoiceNumber);
+            } catch (e) {
+                console.error("Failed to parse JSON response:", e);
+                setError("Không thể đọc dữ liệu từ hóa đơn. Vui lòng thử lại.");
+            }
         }
         setIsProcessing(false);
       };
