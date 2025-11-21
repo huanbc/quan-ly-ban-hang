@@ -5,7 +5,8 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
-      base: '/quan-ly-ban-hang/', 
+      // Đặt lại base về '/' để chạy đúng trên Vercel (root domain)
+      base: '/', 
       
       server: {
         port: 3000,
