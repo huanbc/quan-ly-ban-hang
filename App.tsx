@@ -3,15 +3,15 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Transaction, Customer, Product, Supplier, Employee, UserRole, BusinessDetails } from './types';
 import Dashboard from './components/Dashboard';
 import TransactionList from './components/TransactionList';
+import PurchaseView from './components/PurchaseView';
 import CustomerList from './components/CustomerList';
 import ProductList from './components/ProductList';
 import SupplierList from './components/SupplierList';
-import SalesView from './components/SalesView';
-import PurchaseView from './components/PurchaseView';
-import EmployeeList from './components/EmployeeList';
 import ReportsView from './components/ReportsView';
 import LedgerView from './components/LedgerView';
+import EmployeeList from './components/EmployeeList';
 import AddTransactionModal from './components/AddTransactionModal';
+import SalesView from './components/SalesView';
 import LandingPage from './components/LandingPage';
 import { PlusIcon, ChartIcon, ListIcon, UsersIcon, CubeIcon, TruckIcon, ShoppingCartIcon, DocumentReportIcon, BookOpenIcon, IdentificationIcon, ArchiveBoxArrowDownIcon, HomeIcon } from './constants';
 import { generateId } from './utils';
@@ -53,6 +53,7 @@ const App: React.FC = () => {
   // Login State
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [loginError, setLoginError] = useState('');
 
   const useLocalStorage = <T,>(key: string, state: T, setState: React.Dispatch<React.SetStateAction<T>>, initialState: T) => {
@@ -97,8 +98,25 @@ const App: React.FC = () => {
           password: '123'
       };
       setEmployees([admin]);
-      // Do NOT auto-login newly created admin, require manual login
     }
+  }, [employees]);
+
+  // Auto-login effect
+  useEffect(() => {
+      const savedAuth = localStorage.getItem('saved_auth');
+      if (savedAuth && employees.length > 0 && !currentUser) {
+          try {
+              const { username, password } = JSON.parse(savedAuth);
+              const user = employees.find(u => u.username === username && u.password === password);
+              if (user) {
+                  setCurrentUser(user);
+                  setShowLanding(false); // Skip landing page on auto-login
+              }
+          } catch (e) {
+              console.error("Auto-login failed", e);
+              localStorage.removeItem('saved_auth');
+          }
+      }
   }, [employees]);
 
   const handleLogin = (e: React.FormEvent) => {
@@ -108,6 +126,13 @@ const App: React.FC = () => {
       if (user) {
           setCurrentUser(user);
           setLoginError('');
+          
+          if (rememberMe) {
+              localStorage.setItem('saved_auth', JSON.stringify({ username: loginUsername, password: loginPassword }));
+          } else {
+              localStorage.removeItem('saved_auth');
+          }
+
           setLoginUsername('');
           setLoginPassword('');
       } else {
@@ -118,7 +143,7 @@ const App: React.FC = () => {
   const handleLogout = () => {
       setCurrentUser(null);
       setActiveView('dashboard');
-      // Optional: setShowLanding(true) if you want to go back to landing page on logout
+      localStorage.removeItem('saved_auth'); // Clear auto-login on explicit logout
   };
 
 
@@ -310,6 +335,19 @@ const App: React.FC = () => {
                         />
                     </div>
                     
+                    <div className="flex items-center">
+                        <input
+                            id="remember-me"
+                            type="checkbox"
+                            checked={rememberMe}
+                            onChange={(e) => setRememberMe(e.target.checked)}
+                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                        />
+                        <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900 cursor-pointer">
+                            Lưu mật khẩu và truy cập nhanh
+                        </label>
+                    </div>
+                    
                     {loginError && (
                         <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg text-center">
                             {loginError}
@@ -471,15 +509,15 @@ const App: React.FC = () => {
       {/* Sales Popup Modal */}
       {showSalesModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white w-full h-full max-w-[95vw] max-h-[90vh] rounded-xl shadow-2xl overflow-hidden flex flex-col">
-                 <div className="flex justify-between items-center p-4 border-b bg-gray-50">
+            <div className="bg-white w-full h-full max-w-[98vw] max-h-[95vh] rounded-xl shadow-2xl overflow-hidden flex flex-col">
+                 <div className="flex justify-between items-center p-2 px-4 border-b bg-gray-50">
                     <h2 className="text-xl font-bold text-primary-700 flex items-center gap-2">
                         <ShoppingCartIcon />
                         Bán Hàng
                     </h2>
                     <button onClick={() => setShowSalesModal(false)} className="text-gray-500 hover:text-red-500 text-2xl transition-colors">&times;</button>
                  </div>
-                 <div className="flex-1 overflow-hidden bg-gray-50 p-4">
+                 <div className="flex-1 overflow-hidden bg-gray-100">
                     <SalesView 
                         products={products} 
                         customers={customers} 

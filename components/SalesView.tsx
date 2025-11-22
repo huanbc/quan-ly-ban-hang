@@ -1,6 +1,7 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Product, Customer, Transaction, TransactionType } from '../types';
-import { TrashIcon, PlusIcon } from '../constants';
+import { TrashIcon, PlusIcon, CubeIcon } from '../constants';
 import AddEditCustomerModal from './AddEditCustomerModal';
 
 interface SalesViewProps {
@@ -13,24 +14,40 @@ interface SalesViewProps {
 interface OrderItem {
   product: Product;
   quantity: number;
+  price: number; // Cho phép sửa giá bán trực tiếp
 }
 
-type AppliedPromo = {
-    code: string;
-    type: 'fixed' | 'percent';
-    value: number;
-};
+// Icons nội bộ cho giao diện POS
+const SearchIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+  </svg>
+);
+
+const ScanIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+  </svg>
+);
+
+const UserCircleIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.546 2.916A5.986 5.986 0 0010 16a5.986 5.986 0 004.546-2.084A5 5 0 0010 11z" clipRule="evenodd" />
+    </svg>
+);
 
 const SalesView: React.FC<SalesViewProps> = ({ products, customers, onAddTransaction, onAddCustomer }) => {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank'>('cash');
-  const [promotionCode, setPromotionCode] = useState('');
-  const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
   const [manualDiscount, setManualDiscount] = useState('');
+  const [orderNote, setOrderNote] = useState('');
+  
+  // Bộ lọc nhóm hàng
+  const [selectedCategory, setSelectedCategory] = useState('all');
 
-  // State for new customer search/add functionality
+  // State tìm kiếm khách hàng
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
@@ -48,9 +65,23 @@ const SalesView: React.FC<SalesViewProps> = ({ products, customers, onAddTransac
     };
   }, [customerSearchRef]);
 
+  // Lấy danh sách nhóm hàng từ sản phẩm
+  const categories = useMemo(() => {
+      const cats = new Set(products.map(p => p.subCategory).filter((c): c is string => !!c));
+      return ['all', ...Array.from(cats).sort()];
+  }, [products]);
+
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => {
+        const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()));
+        const matchesCategory = selectedCategory === 'all' || p.subCategory === selectedCategory;
+        return matchesSearch && matchesCategory;
+    });
+  }, [products, searchTerm, selectedCategory]);
+
   const filteredCustomers = useMemo(() => {
     if (!customerSearchTerm) return customers;
-    return customers.filter(c => c.name.toLowerCase().includes(customerSearchTerm.toLowerCase()));
+    return customers.filter(c => c.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) || (c.phone && c.phone.includes(customerSearchTerm)));
   }, [customers, customerSearchTerm]);
 
   const handleSelectCustomer = (customer: Customer) => {
@@ -77,7 +108,6 @@ const SalesView: React.FC<SalesViewProps> = ({ products, customers, onAddTransac
     setCustomerSearchTerm('');
   };
 
-
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
   };
@@ -90,7 +120,7 @@ const SalesView: React.FC<SalesViewProps> = ({ products, customers, onAddTransac
           item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
-      return [...prevItems, { product, quantity: 1 }];
+      return [...prevItems, { product, quantity: 1, price: product.price }];
     });
   };
 
@@ -105,52 +135,22 @@ const SalesView: React.FC<SalesViewProps> = ({ products, customers, onAddTransac
       );
     }
   };
-
-  const { subtotal, vatAmount, discount, total } = useMemo(() => {
-    const subtotal = orderItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-    const vatAmount = orderItems.reduce((sum, item) => {
-        const itemVatRate = (item.product.vat || 0) / 100;
-        const itemTotal = item.product.price * item.quantity;
-        return sum + (itemTotal * itemVatRate);
-    }, 0);
-
-    let promoDiscount = 0;
-    if (appliedPromo && subtotal > 0) {
-      if (appliedPromo.type === 'fixed') {
-        promoDiscount = appliedPromo.value;
-      } else { // 'percent'
-        promoDiscount = subtotal * (appliedPromo.value / 100);
-      }
-    }
-    
-    const parsedManualDiscount = parseFloat(manualDiscount) || 0;
-    const totalDiscount = promoDiscount + parsedManualDiscount;
-    const total = Math.max(0, subtotal + vatAmount - totalDiscount);
-
-    return { subtotal, vatAmount, discount: totalDiscount, total };
-  }, [orderItems, appliedPromo, manualDiscount]);
   
-  const filteredProducts = useMemo(() => {
-    return products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [products, searchTerm]);
-
-  const handleApplyPromo = () => {
-    // Hardcoded promo codes for demonstration
-    const codeUpper = promotionCode.toUpperCase();
-    if (codeUpper === 'GIAM10') {
-      setAppliedPromo({ code: 'GIAM10', type: 'percent', value: 10 });
-    } else if (codeUpper === 'SALE50K') {
-      setAppliedPromo({ code: 'SALE50K', type: 'fixed', value: 50000 });
-    } else {
-      alert('Mã khuyến mại không hợp lệ!');
-      setAppliedPromo(null);
-    }
-  };
-  
-  const handleClearPromo = () => {
-    setPromotionCode('');
-    setAppliedPromo(null);
+  const updatePrice = (productId: string, newPrice: number) => {
+      setOrderItems(prev => 
+        prev.map(item => 
+            item.product.id === productId ? { ...item, price: newPrice } : item
+        )
+      );
   }
+
+  const { subtotal, discount, total } = useMemo(() => {
+    const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const parsedManualDiscount = parseFloat(manualDiscount) || 0;
+    const total = Math.max(0, subtotal - parsedManualDiscount);
+
+    return { subtotal, discount: parsedManualDiscount, total };
+  }, [orderItems, manualDiscount]);
 
   const handleCheckout = () => {
     if (orderItems.length === 0) {
@@ -158,7 +158,8 @@ const SalesView: React.FC<SalesViewProps> = ({ products, customers, onAddTransac
       return;
     }
 
-    const description = `Hóa đơn bán hàng (${orderItems.length} sản phẩm)`;
+    const customerName = customers.find(c => c.id === selectedCustomerId)?.name || 'Khách lẻ';
+    const description = orderNote || `Bán hàng cho ${customerName}`;
     
     const newTransaction: Omit<Transaction, 'id'> = {
         amount: total,
@@ -171,10 +172,9 @@ const SalesView: React.FC<SalesViewProps> = ({ products, customers, onAddTransac
         lineItems: orderItems.map(item => ({
             productId: item.product.id,
             quantity: item.quantity,
-            price: item.product.price
+            price: item.price
         })),
         discountAmount: discount,
-        promotionCode: appliedPromo?.code,
     };
 
     onAddTransaction(newTransaction);
@@ -185,187 +185,263 @@ const SalesView: React.FC<SalesViewProps> = ({ products, customers, onAddTransac
     setCustomerSearchTerm('');
     setSearchTerm('');
     setPaymentMethod('cash');
-    setPromotionCode('');
-    setAppliedPromo(null);
     setManualDiscount('');
+    setOrderNote('');
     alert("Thanh toán thành công!");
   };
 
   return (
     <>
-    <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-8rem)]">
-      {/* Left side - Product List */}
-      <div className="flex-1 lg:w-3/5 bg-white p-4 rounded-xl shadow-lg flex flex-col">
-        <div className="mb-4">
-          <input
-            type="text"
-            placeholder="Tìm kiếm sản phẩm..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
-          />
-        </div>
-        <div className="flex-1 overflow-y-auto pr-2">
-            {filteredProducts.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4">
-                    {filteredProducts.map(product => (
-                    <button
-                        key={product.id}
-                        onClick={() => addProductToOrder(product)}
-                        className="p-3 border rounded-lg text-center hover:bg-primary-50 hover:border-primary-500 transition-all focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    >
-                        <p className="font-semibold text-sm text-gray-800 truncate">{product.name}</p>
-                        <p className="text-xs text-primary-600 font-bold">{formatCurrency(product.price)}</p>
+    <div className="flex h-full bg-gray-100 gap-0 overflow-hidden">
+        {/* LEFT COLUMN: Products (2/3 width) */}
+        <div className="w-2/3 flex flex-col bg-gray-50 border-r border-gray-200 min-w-0">
+            {/* Search & Filter Bar */}
+            <div className="bg-white p-3 shadow-sm z-10 space-y-2">
+                <div className="flex gap-2">
+                    <div className="relative flex-1">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                            <SearchIcon />
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Tìm tên hoặc mã hàng hóa (F3)"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm transition-shadow"
+                            autoFocus
+                        />
+                    </div>
+                    <button className="bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none flex items-center gap-2 whitespace-nowrap transition-colors">
+                        <ScanIcon />
+                        <span className="hidden sm:inline text-sm font-medium">Quét mã</span>
                     </button>
+                </div>
+                
+                {/* Category Tabs */}
+                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 pt-1">
+                    <button 
+                        onClick={() => setSelectedCategory('all')}
+                        className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold transition-colors border ${selectedCategory === 'all' ? 'bg-primary-600 text-white border-primary-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'}`}
+                    >
+                        Tất cả
+                    </button>
+                    {categories.filter(c => c !== 'all').map(cat => (
+                        <button
+                            key={cat}
+                            onClick={() => setSelectedCategory(cat)}
+                            className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold transition-colors border ${selectedCategory === cat ? 'bg-primary-600 text-white border-primary-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'}`}
+                        >
+                            {cat}
+                        </button>
                     ))}
                 </div>
-            ) : (
-                <div className="flex items-center justify-center h-full text-gray-500">
-                    <p>Không tìm thấy sản phẩm.</p>
-                </div>
-            )}
-        </div>
-      </div>
+            </div>
 
-      {/* Right side - Invoice/Cart */}
-      <div className="lg:w-2/5 bg-white p-4 rounded-xl shadow-lg flex flex-col">
-        <h2 className="text-xl font-bold text-gray-700 mb-4 pb-2 border-b">Hóa Đơn</h2>
-        
-        <div className="mb-4" ref={customerSearchRef}>
-          <label htmlFor="customer-search" className="block text-sm font-medium text-gray-700 mb-1">Khách hàng</label>
-          <div className="relative">
-            <input
-              id="customer-search"
-              type="text"
-              value={customerSearchTerm}
-              onChange={(e) => {
-                setCustomerSearchTerm(e.target.value);
-                if (selectedCustomerId) setSelectedCustomerId('');
-                setIsCustomerDropdownOpen(true);
-              }}
-              onFocus={() => setIsCustomerDropdownOpen(true)}
-              placeholder="Tìm hoặc thêm mới khách hàng..."
-              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
-              autoComplete="off"
-            />
-            {selectedCustomerId && (
-              <button
-                onClick={handleClearCustomer}
-                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
-                aria-label="Xóa khách hàng đã chọn"
-              >
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"></path></svg>
-              </button>
-            )}
-            {isCustomerDropdownOpen && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                {filteredCustomers.map(customer => (
-                  <button
-                    key={customer.id}
-                    onClick={() => handleSelectCustomer(customer)}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    {customer.name}
-                  </button>
-                ))}
-                <button
-                  onClick={handleAddNewCustomerClick}
-                  className="flex items-center space-x-2 w-full text-left px-4 py-2 text-sm font-semibold text-primary-600 bg-primary-50 hover:bg-primary-100"
-                >
-                  <PlusIcon />
-                  <span>Thêm mới khách hàng "{customerSearchTerm}"</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
-            {orderItems.length > 0 ? (
-                <ul className="divide-y divide-gray-200">
-                    {orderItems.map(item => (
-                        <li key={item.product.id} className="py-3 flex items-center justify-between">
-                            <div>
-                                <p className="font-semibold text-sm">{item.product.name}</p>
-                                <p className="text-xs text-gray-500">{formatCurrency(item.product.price)}</p>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <div className="flex items-center border rounded-md">
-                                    <button onClick={() => updateQuantity(item.product.id, item.quantity - 1)} className="px-2 py-1 text-lg font-bold">-</button>
-                                    <input 
-                                        type="number" 
-                                        value={item.quantity} 
-                                        onChange={(e) => updateQuantity(item.product.id, parseInt(e.target.value) || 1)}
-                                        className="w-12 text-center border-l border-r"
-                                    />
-                                    <button onClick={() => updateQuantity(item.product.id, item.quantity + 1)} className="px-2 py-1 text-lg font-bold">+</button>
+            {/* Product Grid */}
+            <div className="flex-1 overflow-y-auto p-4">
+                {filteredProducts.length > 0 ? (
+                    <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                        {filteredProducts.map(product => (
+                            <div
+                                key={product.id}
+                                onClick={() => addProductToOrder(product)}
+                                className="bg-white rounded-lg shadow-sm hover:shadow-md cursor-pointer transition-all transform hover:-translate-y-1 border border-gray-200 flex flex-col overflow-hidden group h-40"
+                            >
+                                <div className="flex-1 flex items-center justify-center bg-gray-50 relative group-hover:bg-blue-50 transition-colors">
+                                    <div className="text-gray-400 group-hover:text-primary-500 transition-colors">
+                                        {product.subCategory?.includes('Laptop') ? (
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                        ) : product.subCategory?.includes('PC') ? (
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                        ) : (
+                                            <CubeIcon />
+                                        )}
+                                    </div>
+                                    <span className="absolute top-1 right-1 bg-white/80 backdrop-blur-sm text-gray-600 text-[10px] font-medium px-1.5 py-0.5 rounded shadow-sm border border-gray-100">
+                                        SL: {product.initialStock}
+                                    </span>
                                 </div>
-                                <button onClick={() => updateQuantity(item.product.id, 0)} className="text-gray-400 hover:text-red-500 p-1"><TrashIcon /></button>
+                                <div className="p-2.5 text-center bg-white border-t border-gray-100">
+                                    <p className="text-xs font-semibold text-gray-800 line-clamp-1 mb-1" title={product.name}>{product.name}</p>
+                                    <p className="text-sm font-bold text-primary-600">{formatCurrency(product.price)}</p>
+                                </div>
                             </div>
-                        </li>
-                    ))}
-                </ul>
-            ) : (
-                <div className="flex items-center justify-center h-full text-gray-400">
-                    <p>Chưa có sản phẩm trong hóa đơn.</p>
-                </div>
-            )}
-        </div>
-        
-        <div className="border-t pt-4 mt-4 space-y-2">
-            <div className="flex justify-between items-center text-md">
-                <span className="text-gray-600">Tổng tiền hàng:</span>
-                <span className="font-semibold">{formatCurrency(subtotal)}</span>
-            </div>
-            <div className="flex justify-between items-center text-md">
-                <span className="text-gray-600">Thuế GTGT:</span>
-                <span className="font-semibold">{formatCurrency(vatAmount)}</span>
-            </div>
-             <div className="my-2 border-t"></div>
-            <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                    <input type="text" placeholder="Mã khuyến mại" value={promotionCode} onChange={e => setPromotionCode(e.target.value)} className="flex-grow p-2 text-sm border border-gray-300 rounded-lg"/>
-                    <button onClick={handleApplyPromo} className="px-3 py-2 text-sm bg-primary-100 text-primary-700 rounded-lg hover:bg-primary-200">Áp dụng</button>
-                </div>
-                {appliedPromo && (
-                    <div className="flex justify-between items-center text-sm text-green-600 bg-green-50 p-2 rounded-lg">
-                        <span>Đã áp dụng mã: <strong>{appliedPromo.code}</strong></span>
-                        <button onClick={handleClearPromo} className="font-bold text-red-500">&times;</button>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                        <div className="bg-gray-200 p-4 rounded-full mb-3">
+                             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        </div>
+                        <p className="font-medium">Không tìm thấy hàng hóa nào.</p>
                     </div>
                 )}
-                 <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">Giảm giá trực tiếp:</span>
-                    <input type="number" placeholder="0" value={manualDiscount} onChange={e => setManualDiscount(e.target.value)} className="w-full p-2 text-sm border border-gray-300 rounded-lg text-right"/>
-                </div>
             </div>
-            {discount > 0 && (
-                <div className="flex justify-between items-center text-md text-red-600">
-                    <span className="font-semibold">Tổng giảm giá:</span>
-                    <span className="font-bold">- {formatCurrency(discount)}</span>
-                </div>
-            )}
-             <div className="my-2 border-t"></div>
-             <div className="flex justify-between items-center">
-                <span className="text-gray-600 text-sm">Thanh toán bằng:</span>
-                <div className="flex items-center rounded-lg bg-gray-100 p-0.5">
-                    <button onClick={() => setPaymentMethod('cash')} className={`px-3 py-1 text-sm rounded-md ${paymentMethod === 'cash' ? 'bg-white shadow' : ''}`}>Tiền mặt</button>
-                    <button onClick={() => setPaymentMethod('bank')} className={`px-3 py-1 text-sm rounded-md ${paymentMethod === 'bank' ? 'bg-white shadow' : ''}`}>Chuyển khoản</button>
-                </div>
-            </div>
-             <div className="flex justify-between items-center text-xl font-bold text-primary-700 pt-2">
-                <span>Khách cần trả:</span>
-                <span>{formatCurrency(total)}</span>
-            </div>
-            <button
-                onClick={handleCheckout}
-                disabled={orderItems.length === 0}
-                className="w-full mt-2 bg-primary-600 text-white font-bold py-3 rounded-lg hover:bg-primary-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-            >
-                Thanh Toán
-            </button>
         </div>
-      </div>
+
+        {/* RIGHT COLUMN: Invoice (1/3 width) */}
+        <div className="w-1/3 bg-white flex flex-col shadow-xl z-20 border-l border-gray-200 h-full">
+            {/* Customer Header */}
+            <div className="p-3 border-b bg-gray-50">
+                <div className="relative" ref={customerSearchRef}>
+                    <input
+                        type="text"
+                        value={customerSearchTerm}
+                        onChange={(e) => {
+                            setCustomerSearchTerm(e.target.value);
+                            if (selectedCustomerId) setSelectedCustomerId('');
+                            setIsCustomerDropdownOpen(true);
+                        }}
+                        onFocus={() => setIsCustomerDropdownOpen(true)}
+                        placeholder="Tìm khách hàng (F4)"
+                        className="w-full pl-9 pr-8 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 transition-shadow shadow-sm"
+                    />
+                    <div className="absolute left-3 top-2.5 text-gray-400">
+                        <UserCircleIcon />
+                    </div>
+                    <button 
+                        className="absolute right-2 top-2 text-primary-600 hover:bg-primary-50 p-1 rounded transition-colors"
+                        onClick={handleAddNewCustomerClick}
+                        title="Thêm khách hàng mới"
+                    >
+                        <PlusIcon />
+                    </button>
+
+                    {isCustomerDropdownOpen && (
+                        <div className="absolute z-30 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                            {filteredCustomers.length > 0 ? filteredCustomers.map(customer => (
+                            <button
+                                key={customer.id}
+                                onClick={() => handleSelectCustomer(customer)}
+                                className="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 border-b border-gray-50 last:border-none transition-colors"
+                            >
+                                <div className="font-bold text-gray-800">{customer.name}</div>
+                                <div className="text-xs text-gray-500">{customer.phone}</div>
+                            </button>
+                            )) : (
+                                <div className="p-3 text-center text-sm text-gray-500 italic">Không tìm thấy khách hàng</div>
+                            )}
+                        </div>
+                    )}
+                </div>
+                {selectedCustomerId && (
+                    <div className="mt-2 flex justify-between items-center text-xs bg-blue-50 px-2 py-1 rounded text-blue-700 border border-blue-100">
+                        <span className="font-semibold truncate max-w-[150px]">{customerSearchTerm}</span>
+                        <button onClick={handleClearCustomer} className="hover:underline text-blue-800">Bỏ chọn</button>
+                    </div>
+                )}
+            </div>
+
+            {/* Cart List */}
+            <div className="flex-1 overflow-y-auto bg-white px-2">
+                {orderItems.length > 0 ? (
+                    <ul className="divide-y divide-gray-100">
+                        {orderItems.map((item, index) => (
+                            <li key={`${item.product.id}-${index}`} className="py-3 hover:bg-gray-50 transition-colors group px-2 rounded-md">
+                                <div className="flex justify-between items-start mb-1">
+                                    <span className="text-sm font-semibold text-gray-800 line-clamp-2">{item.product.name}</span>
+                                    <button onClick={() => updateQuantity(item.product.id, 0)} className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100">
+                                        <TrashIcon />
+                                    </button>
+                                </div>
+                                <div className="flex justify-between items-center mt-2">
+                                    <div className="flex items-center border border-gray-300 rounded-md bg-white overflow-hidden h-8">
+                                        <button onClick={() => updateQuantity(item.product.id, item.quantity - 1)} className="px-2.5 h-full text-gray-600 hover:bg-gray-100 border-r active:bg-gray-200 font-bold">-</button>
+                                        <input 
+                                            type="number" 
+                                            value={item.quantity} 
+                                            onChange={(e) => updateQuantity(item.product.id, parseInt(e.target.value) || 1)}
+                                            className="w-12 h-full text-center text-sm font-semibold border-none focus:ring-0 p-0"
+                                        />
+                                        <button onClick={() => updateQuantity(item.product.id, item.quantity + 1)} className="px-2.5 h-full text-gray-600 hover:bg-gray-100 border-l active:bg-gray-200 font-bold">+</button>
+                                    </div>
+                                    <div className="flex flex-col items-end">
+                                        <input 
+                                            type="number"
+                                            value={item.price}
+                                            onChange={e => updatePrice(item.product.id, parseFloat(e.target.value))}
+                                            className="text-right text-sm font-bold text-primary-700 w-28 border-none p-0 bg-transparent focus:ring-0 hover:bg-gray-50 rounded cursor-pointer"
+                                        />
+                                        <span className="text-[10px] text-gray-400 font-medium">{formatCurrency(item.price * item.quantity)}</span>
+                                    </div>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-300 opacity-60">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-20 w-20 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                        <p className="text-sm">Chưa có hàng hóa</p>
+                    </div>
+                )}
+            </div>
+
+            {/* Payment Section */}
+            <div className="bg-gray-50 border-t border-gray-200 p-4 space-y-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600 font-medium">Tổng tiền hàng</span>
+                    <span className="font-bold text-gray-800">{formatCurrency(subtotal)}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600 font-medium">Giảm giá</span>
+                    <div className="flex items-center w-32 border-b border-gray-300 focus-within:border-primary-500">
+                        <input 
+                            type="number" 
+                            placeholder="0" 
+                            value={manualDiscount} 
+                            onChange={e => setManualDiscount(e.target.value)} 
+                            className="w-full text-right bg-transparent focus:outline-none text-sm p-1"
+                        />
+                    </div>
+                </div>
+                
+                <div className="border-t border-dashed border-gray-300 my-2"></div>
+                
+                <div className="flex justify-between items-end mb-2">
+                    <span className="text-gray-800 font-bold text-lg">Khách cần trả</span>
+                    <span className="text-2xl font-extrabold text-primary-600">{formatCurrency(total)}</span>
+                </div>
+
+                {/* Payment Method */}
+                <div className="flex bg-gray-200 p-1 rounded-lg mb-3">
+                    <button 
+                        onClick={() => setPaymentMethod('cash')} 
+                        className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${paymentMethod === 'cash' ? 'bg-white text-primary-700 shadow' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Tiền mặt
+                    </button>
+                    <button 
+                        onClick={() => setPaymentMethod('bank')} 
+                        className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${paymentMethod === 'bank' ? 'bg-white text-primary-700 shadow' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Chuyển khoản
+                    </button>
+                </div>
+
+                <input 
+                    type="text" 
+                    placeholder="Ghi chú đơn hàng..." 
+                    value={orderNote}
+                    onChange={e => setOrderNote(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-1 focus:ring-primary-500 focus:border-primary-500 mb-2"
+                />
+
+                <div className="flex gap-3 pt-2">
+                    <button className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 rounded-lg shadow text-sm uppercase transition-colors">
+                        In phiếu
+                    </button>
+                    <button 
+                        onClick={handleCheckout}
+                        disabled={orderItems.length === 0}
+                        className="flex-[2] bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-lg shadow-lg text-base uppercase transition-all active:scale-95 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none"
+                    >
+                        Thanh toán
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
+    
     {isAddCustomerModalOpen && (
         <AddEditCustomerModal
           onClose={() => setIsAddCustomerModalOpen(false)}
