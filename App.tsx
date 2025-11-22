@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Transaction, Customer, Product, Supplier, Employee, UserRole, BusinessDetails } from './types';
 import Dashboard from './components/Dashboard';
@@ -13,7 +15,7 @@ import EmployeeList from './components/EmployeeList';
 import AddTransactionModal from './components/AddTransactionModal';
 import SalesView from './components/SalesView';
 import LandingPage from './components/LandingPage';
-import { PlusIcon, ChartIcon, ListIcon, UsersIcon, CubeIcon, TruckIcon, ShoppingCartIcon, DocumentReportIcon, BookOpenIcon, IdentificationIcon, ArchiveBoxArrowDownIcon, HomeIcon } from './constants';
+import { PlusIcon, ChartIcon, ListIcon, UsersIcon, CubeIcon, TruckIcon, ShoppingCartIcon, DocumentReportIcon, BookOpenIcon, IdentificationIcon, ArchiveBoxArrowDownIcon, HomeIcon, CurrencyDollarIcon } from './constants';
 import { generateId } from './utils';
 
 type View = 'dashboard' | 'transactions' | 'customers' | 'products' | 'suppliers' | 'sales' | 'purchase' | 'reports' | 'ledger' | 'employees';
@@ -214,8 +216,11 @@ const App: React.FC = () => {
 
 
   const NavItem = ({ view, label, icon, mobile = false, onClick }: { view: View, label: string, icon: React.ReactElement, mobile?: boolean, onClick?: () => void }) => {
-    if (!hasPermission(view)) return null;
+    if (!hasPermission(view) && view !== 'transactions') return null; // Exception for 'transactions' view check for 'Thu - Chi' button which uses 'transactions' view permission essentially or generic
     
+    // Special check for "Thu - Chi" button which reuses the generic 'transactions' view key for permission but isn't a view itself in this context
+    if (label === "Thu - Chi" && !currentUser) return null;
+
     const isActive = activeView === view && !onClick;
     const handleClick = () => {
         if (onClick) {
@@ -397,27 +402,38 @@ const App: React.FC = () => {
                  </button>
             </div>
             <NavItem view="dashboard" label="Tổng Quan" icon={<ChartIcon />} />
-            <NavItem view="sales" label="Bán Hàng" icon={<ShoppingCartIcon />} onClick={() => setShowSalesModal(true)} />
+            <NavItem view="sales" label="Bán Hàng (POS)" icon={<ShoppingCartIcon />} onClick={() => setShowSalesModal(true)} />
             <NavItem view="purchase" label="Nhập Hàng" icon={<ArchiveBoxArrowDownIcon />} />
             <NavItem view="transactions" label="Giao Dịch" icon={<ListIcon />} />
             <NavItem view="customers" label="Khách Hàng" icon={<UsersIcon />} />
             <NavItem view="suppliers" label="Nhà Cung Cấp" icon={<TruckIcon />} />
             <NavItem view="products" label="Hàng Hóa" icon={<CubeIcon />} />
+            
+            {/* Nút Thu - Chi mới được thêm vào đây */}
+            {(currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.ACCOUNTANT) && (
+                <NavItem 
+                    view="transactions" // Reusing transactions permission logic
+                    label="Thu - Chi" 
+                    icon={<CurrencyDollarIcon />} 
+                    onClick={() => { setIsModalOpen(true); setIsSidebarOpen(false); }} 
+                />
+            )}
+
             <NavItem view="ledger" label="Sổ Sách" icon={<BookOpenIcon />} onClick={() => setShowLedgerModal(true)} />
             <NavItem view="reports" label="Báo Cáo" icon={<DocumentReportIcon />} />
             <NavItem view="employees" label="Nhân Viên" icon={<IdentificationIcon />} />
              
-            {(currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.ACCOUNTANT) && (
+            {(currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SALES) && (
                 <button
                     onClick={() => {
-                        setIsModalOpen(true);
+                        setShowSalesModal(true);
                         setIsSidebarOpen(false);
                     }}
-                    className={`w-full mt-4 flex items-center justify-center space-x-2 bg-primary-600 text-white px-4 py-3 rounded-lg shadow-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-transform hover:scale-105 ${!isSidebarOpen ? 'opacity-0' : 'opacity-100'}`}
-                    aria-label="Thêm giao dịch mới"
+                    className={`w-full mt-4 flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-3 rounded-lg shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-transform hover:scale-105 ${!isSidebarOpen ? 'opacity-0' : 'opacity-100'}`}
+                    aria-label="Bán hàng"
                 >
-                    <PlusIcon />
-                    <span className="text-sm font-semibold">Giao Dịch Nhanh</span>
+                    <ShoppingCartIcon />
+                    <span className="text-sm font-semibold">Bán Hàng</span>
                 </button>
             )}
 
