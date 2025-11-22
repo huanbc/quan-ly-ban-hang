@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
-import { Transaction, TransactionType, Product, Supplier, LineItem } from '../types';
+import { Transaction, TransactionType, Product, Supplier, LineItem, TaxCategory } from '../types';
 import { formatCurrency, generateId } from '../utils';
 
 interface OCRPurchaseModalProps {
@@ -21,6 +21,8 @@ interface ExtractedItem {
     quantity: number;
     unitPrice: number;
     vat: number;
+    taxCategory?: TaxCategory;
+    subCategory?: string; // Nhóm hàng phụ (PC, Laptop...)
 }
 
 interface InvoiceData {
@@ -79,6 +81,8 @@ const OCRPurchaseModal: React.FC<OCRPurchaseModalProps> = ({
 }) => {
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [bulkTaxCategory, setBulkTaxCategory] = useState<TaxCategory | ''>('');
+  const [bulkSubCategory, setBulkSubCategory] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedItem = items.find(i => i.id === selectedId);
@@ -160,7 +164,7 @@ const OCRPurchaseModal: React.FC<OCRPurchaseModalProps> = ({
                     }
                 },
                 {
-                    text: "Extract invoice data: date (YYYY-MM-DD), invoiceNumber, supplierName, supplierPhone, supplierAddress, items (list of {sku, name, quantity, unitPrice, vat}). If SKU is missing, leave empty. Return JSON."
+                    text: "Extract invoice data: date (YYYY-MM-DD), invoiceNumber, supplierName, supplierPhone, supplierAddress, items (list of {sku, name, quantity, unitPrice, vat, category}). 'category' should be a short generic type like 'Laptop', 'PC', 'Văn phòng phẩm', 'Điện thoại', 'Phụ kiện'. If SKU is missing, leave empty. Return JSON."
                 }
             ]
           },
@@ -183,7 +187,8 @@ const OCRPurchaseModal: React.FC<OCRPurchaseModalProps> = ({
                                 name: { type: Type.STRING },
                                 quantity: { type: Type.NUMBER },
                                 unitPrice: { type: Type.NUMBER },
-                                vat: { type: Type.NUMBER }
+                                vat: { type: Type.NUMBER },
+                                category: { type: Type.STRING }
                             }
                         }
                     }
@@ -195,6 +200,12 @@ const OCRPurchaseModal: React.FC<OCRPurchaseModalProps> = ({
         const text = response.text;
         if (text) {
             const data = JSON.parse(text);
+            const processedItems = (data.items || []).map((i: any) => ({
+                ...i,
+                taxCategory: undefined, // Initialize as undefined, user must select if new
+                subCategory: i.category || ''
+            }));
+
             setItems(prev => prev.map(i => i.id === item.id ? {
                 ...i,
                 status: 'success',
@@ -205,7 +216,7 @@ const OCRPurchaseModal: React.FC<OCRPurchaseModalProps> = ({
                     supplierName: data.supplierName || '',
                     supplierPhone: data.supplierPhone || '',
                     supplierAddress: data.supplierAddress || '',
-                    items: data.items || [],
+                    items: processedItems,
                     description: data.invoiceNumber ? `Nhập hàng HĐ ${data.invoiceNumber}` : 'Nhập hàng'
                 }
             } : i));
@@ -257,9 +268,27 @@ const OCRPurchaseModal: React.FC<OCRPurchaseModalProps> = ({
 
   const addItemRow = () => {
       if (!selectedItem) return;
-      const newItems = [...selectedItem.data.items, { sku: '', name: '', quantity: 1, unitPrice: 0, vat: 0 }];
+      const newItems = [...selectedItem.data.items, { sku: '', name: '', quantity: 1, unitPrice: 0, vat: 0, subCategory: '' }];
       updateItemData(selectedItem.id, 'items', newItems);
   }
+
+  const applyTaxCategoryToAll = () => {
+      if (!selectedItem || !bulkTaxCategory) return;
+      const newItems = selectedItem.data.items.map(item => ({
+          ...item,
+          taxCategory: bulkTaxCategory as TaxCategory
+      }));
+      updateItemData(selectedItem.id, 'items', newItems);
+  };
+
+  const applySubCategoryToAll = () => {
+      if (!selectedItem || !bulkSubCategory) return;
+      const newItems = selectedItem.data.items.map(item => ({
+          ...item,
+          subCategory: bulkSubCategory
+      }));
+      updateItemData(selectedItem.id, 'items', newItems);
+  };
 
   const handleSaveItem = async (id: string) => {
       const item = items.find(i => i.id === id);
@@ -322,7 +351,9 @@ const OCRPurchaseModal: React.FC<OCRPurchaseModalProps> = ({
                   ...product,
                   purchasePrice: newCostPrice,
                   // Also update VAT if provided
-                  vat: importedItem.vat || product.vat
+                  vat: importedItem.vat || product.vat,
+                  // Update subCategory if currently empty and incoming has value
+                  subCategory: (!product.subCategory && importedItem.subCategory) ? importedItem.subCategory : product.subCategory
               });
 
           } else {
@@ -335,7 +366,9 @@ const OCRPurchaseModal: React.FC<OCRPurchaseModalProps> = ({
                       purchasePrice: importedItem.unitPrice,
                       unit: 'Cái', // Default unit
                       initialStock: 0,
-                      vat: importedItem.vat
+                      vat: importedItem.vat,
+                      taxCategory: importedItem.taxCategory, // Use scanned tax category for new product
+                      subCategory: importedItem.subCategory || 'Chung' // Use scanned subCategory
                   }, (newProd) => {
                       productId = newProd.id;
                       resolve();
@@ -489,19 +522,57 @@ const OCRPurchaseModal: React.FC<OCRPurchaseModalProps> = ({
 
                             {/* Items Table */}
                             <div className="mt-6">
-                                <div className="flex justify-between items-center mb-2">
+                                <div className="flex justify-between items-end mb-2">
                                     <h4 className="font-bold text-gray-700">Chi tiết hàng hóa</h4>
                                     <button onClick={addItemRow} className="text-xs bg-primary-50 text-primary-700 px-2 py-1 rounded hover:bg-primary-100">+ Thêm dòng</button>
                                 </div>
+                                
+                                {/* Bulk Tools */}
+                                <div className="bg-blue-50 p-3 rounded-lg mb-3 border border-blue-100 grid grid-cols-2 gap-4">
+                                    {/* Bulk Tax Category */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-blue-800 mb-1">Nhóm ngành thuế (Toàn bộ):</label>
+                                        <div className="flex gap-2">
+                                            <select 
+                                                value={bulkTaxCategory} 
+                                                onChange={e => setBulkTaxCategory(e.target.value as TaxCategory)} 
+                                                className="flex-1 border-blue-300 rounded text-sm py-1"
+                                            >
+                                                <option value="">-- Chọn nhóm thuế --</option>
+                                                {Object.values(TaxCategory).map(cat => (
+                                                    <option key={cat} value={cat}>{cat}</option>
+                                                ))}
+                                            </select>
+                                            <button onClick={applyTaxCategoryToAll} className="bg-blue-600 text-white text-xs px-2 py-1 rounded hover:bg-blue-700">Áp dụng</button>
+                                        </div>
+                                    </div>
+                                    {/* Bulk Sub Category */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-blue-800 mb-1">Nhóm hàng phụ (Toàn bộ):</label>
+                                        <div className="flex gap-2">
+                                            <input 
+                                                type="text"
+                                                value={bulkSubCategory}
+                                                onChange={e => setBulkSubCategory(e.target.value)}
+                                                placeholder="VD: Văn phòng phẩm, Laptop..."
+                                                className="flex-1 border-blue-300 rounded text-sm py-1 px-2"
+                                            />
+                                            <button onClick={applySubCategoryToAll} className="bg-blue-600 text-white text-xs px-2 py-1 rounded hover:bg-blue-700">Áp dụng</button>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <table className="min-w-full divide-y divide-gray-200 border text-sm">
                                     <thead className="bg-gray-50">
                                         <tr>
-                                            <th className="px-3 py-2 text-left font-medium text-gray-500">Tên hàng</th>
-                                            <th className="px-3 py-2 text-left font-medium text-gray-500 w-24">SKU</th>
-                                            <th className="px-3 py-2 text-right font-medium text-gray-500 w-20">SL</th>
-                                            <th className="px-3 py-2 text-right font-medium text-gray-500 w-28">Đơn giá</th>
-                                            <th className="px-3 py-2 text-right font-medium text-gray-500 w-16">VAT%</th>
-                                            <th className="px-3 py-2 w-10"></th>
+                                            <th className="px-2 py-2 text-left font-medium text-gray-500">Tên hàng</th>
+                                            <th className="px-2 py-2 text-left font-medium text-gray-500 w-20">SKU</th>
+                                            <th className="px-2 py-2 text-right font-medium text-gray-500 w-16">SL</th>
+                                            <th className="px-2 py-2 text-right font-medium text-gray-500 w-24">Đơn giá</th>
+                                            <th className="px-2 py-2 text-right font-medium text-gray-500 w-14">VAT</th>
+                                            <th className="px-2 py-2 text-left font-medium text-gray-500 w-28">Nhóm hàng</th>
+                                            <th className="px-2 py-2 text-left font-medium text-gray-500 w-32">Nhóm ngành thuế</th>
+                                            <th className="px-2 py-2 w-8"></th>
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
@@ -522,6 +593,21 @@ const OCRPurchaseModal: React.FC<OCRPurchaseModalProps> = ({
                                                 <td className="px-2 py-1">
                                                     <input type="number" value={item.vat} onChange={e => handleItemChange(idx, 'vat', parseFloat(e.target.value))} className="w-full border-none focus:ring-0 text-sm p-1 text-right" />
                                                 </td>
+                                                <td className="px-2 py-1">
+                                                    <input type="text" value={item.subCategory || ''} onChange={e => handleItemChange(idx, 'subCategory', e.target.value)} className="w-full border-none focus:ring-0 text-xs p-1" placeholder="Loại hàng" />
+                                                </td>
+                                                <td className="px-2 py-1">
+                                                    <select 
+                                                        value={item.taxCategory || ''} 
+                                                        onChange={e => handleItemChange(idx, 'taxCategory', e.target.value)}
+                                                        className="w-full border-none focus:ring-0 text-xs p-1 bg-transparent"
+                                                    >
+                                                        <option value="">-- Chọn --</option>
+                                                        {Object.values(TaxCategory).map(cat => (
+                                                            <option key={cat} value={cat}>{cat}</option>
+                                                        ))}
+                                                    </select>
+                                                </td>
                                                 <td className="px-2 py-1 text-center">
                                                     <button onClick={() => deleteItemRow(idx)} className="text-gray-400 hover:text-red-500"><TrashIcon /></button>
                                                 </td>
@@ -532,7 +618,7 @@ const OCRPurchaseModal: React.FC<OCRPurchaseModalProps> = ({
                                         <tr className="bg-gray-50 font-bold">
                                             <td colSpan={3} className="px-3 py-2 text-right">Tổng cộng:</td>
                                             <td className="px-3 py-2 text-right">{formatCurrency(calculateTotal())}</td>
-                                            <td colSpan={2}></td>
+                                            <td colSpan={4}></td>
                                         </tr>
                                     </tfoot>
                                 </table>

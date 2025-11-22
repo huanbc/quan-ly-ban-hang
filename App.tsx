@@ -46,6 +46,11 @@ const App: React.FC = () => {
   const [activeView, setActiveView] = useState<View>('dashboard');
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
 
+  // Login State
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+
   const useLocalStorage = <T,>(key: string, state: T, setState: React.Dispatch<React.SetStateAction<T>>, initialState: T) => {
     useEffect(() => {
       try {
@@ -80,14 +85,37 @@ const App: React.FC = () => {
   useEffect(() => {
     // Initialize default admin if no employees exist
     if (employees.length === 0) {
-      const admin: Employee = { id: generateId(), name: 'Admin', role: UserRole.ADMIN };
+      const admin: Employee = { 
+          id: generateId(), 
+          name: 'Admin', 
+          role: UserRole.ADMIN,
+          username: 'admin',
+          password: '123'
+      };
       setEmployees([admin]);
-      setCurrentUser(admin);
-    } else if (!currentUser) {
-      // Auto-login first user (or admin if available)
-      setCurrentUser(employees.find(e => e.role === UserRole.ADMIN) || employees[0]);
+      // Do NOT auto-login newly created admin, require manual login
     }
   }, [employees]);
+
+  const handleLogin = (e: React.FormEvent) => {
+      e.preventDefault();
+      const user = employees.find(u => u.username === loginUsername && u.password === loginPassword);
+      
+      if (user) {
+          setCurrentUser(user);
+          setLoginError('');
+          setLoginUsername('');
+          setLoginPassword('');
+      } else {
+          setLoginError('Tên tài khoản hoặc mật khẩu không chính xác.');
+      }
+  };
+
+  const handleLogout = () => {
+      setCurrentUser(null);
+      setActiveView('dashboard');
+      // Optional: setShowLanding(true) if you want to go back to landing page on logout
+  };
 
 
   const addTransaction = (transaction: Omit<Transaction, 'id'>) => {
@@ -192,22 +220,18 @@ const App: React.FC = () => {
   
   const UserSelector = () => (
     <div className="mt-auto pt-4 border-t border-gray-200">
-        <label htmlFor="user-select" className="block text-xs text-gray-500 mb-1">Người dùng</label>
-        <select
-            id="user-select"
-            value={currentUser?.id || ''}
-            onChange={(e) => setCurrentUser(employees.find(emp => emp.id === e.target.value) || null)}
-            className="w-full p-2 text-sm border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
-        >
-            {employees.map(emp => (
-                <option key={emp.id} value={emp.id}>
-                    {emp.name} ({emp.role})
-                </option>
-            ))}
-        </select>
+        <div className="flex items-center gap-3 px-2 mb-3">
+             <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold">
+                 {currentUser?.name.charAt(0)}
+             </div>
+             <div className="overflow-hidden">
+                 <p className="text-sm font-medium text-gray-700 truncate">{currentUser?.name}</p>
+                 <p className="text-xs text-gray-500 truncate">{currentUser?.role}</p>
+             </div>
+        </div>
          <button
-            onClick={() => setCurrentUser(null)}
-            className="w-full mt-2 text-sm text-center text-gray-500 hover:text-primary-600"
+            onClick={handleLogout}
+            className="w-full py-2 text-sm text-center text-red-600 hover:bg-red-50 rounded-md transition-colors"
         >
             Đăng xuất
         </button>
@@ -246,22 +270,64 @@ const App: React.FC = () => {
 
   if (!currentUser) {
     return (
-        <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
             <div className="w-full max-w-sm bg-white p-8 rounded-xl shadow-lg">
-                <h1 className="text-2xl font-bold text-center text-primary-700 mb-6">Đăng Nhập</h1>
-                <p className="text-center text-gray-600 mb-4">Vui lòng chọn tài khoản của bạn</p>
-                <div className="space-y-3">
-                    {employees.map(emp => (
-                        <button
-                            key={emp.id}
-                            onClick={() => setCurrentUser(emp)}
-                            className="w-full text-left p-4 bg-gray-50 rounded-lg hover:bg-primary-100 border border-gray-200 hover:border-primary-300 transition-colors"
-                        >
-                            <p className="font-semibold text-gray-800">{emp.name}</p>
-                            <p className="text-sm text-primary-600">{emp.role}</p>
-                        </button>
-                    ))}
+                <div className="text-center mb-6">
+                     <div className="inline-block p-3 rounded-full bg-primary-100 text-primary-600 mb-2">
+                         <IdentificationIcon />
+                     </div>
+                    <h1 className="text-2xl font-bold text-gray-800">Đăng Nhập</h1>
+                    <p className="text-gray-600 text-sm mt-1">Hệ thống sổ sách kế toán</p>
                 </div>
+                
+                <form onSubmit={handleLogin} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Tên tài khoản</label>
+                        <input 
+                            type="text" 
+                            value={loginUsername}
+                            onChange={e => setLoginUsername(e.target.value)}
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                            placeholder="Nhập tên tài khoản"
+                            required
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu</label>
+                        <input 
+                            type="password" 
+                            value={loginPassword}
+                            onChange={e => setLoginPassword(e.target.value)}
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                            placeholder="Nhập mật khẩu"
+                            required
+                        />
+                    </div>
+                    
+                    {loginError && (
+                        <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg text-center">
+                            {loginError}
+                        </div>
+                    )}
+
+                    <button 
+                        type="submit"
+                        className="w-full bg-primary-600 text-white font-bold py-3 rounded-lg hover:bg-primary-700 transition-colors shadow-md"
+                    >
+                        Đăng nhập
+                    </button>
+                </form>
+
+                <div className="mt-6 pt-6 border-t border-gray-100 text-center">
+                    <button onClick={() => setShowLanding(true)} className="text-sm text-gray-500 hover:text-primary-600">
+                        &larr; Quay lại trang giới thiệu
+                    </button>
+                </div>
+            </div>
+            
+            <div className="mt-8 text-center text-gray-500 text-xs">
+                <p className="font-bold uppercase">Sổ Sách Kế Toán</p>
+                <p className="mt-1">Tác giả: Lê Minh Huấn | SĐT: 0912.041.201</p>
             </div>
         </div>
     )
@@ -270,7 +336,7 @@ const App: React.FC = () => {
   return (
     <div className="bg-gray-50 min-h-screen text-gray-800 flex">
         {/* Sidebar for Desktop */}
-        <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 p-4 space-y-2 fixed h-full">
+        <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 p-4 space-y-2 fixed h-full overflow-y-auto">
             <div className="px-2 mb-4 flex items-center justify-between">
                  <h1 className="text-lg font-bold text-primary-700 cursor-pointer" onClick={() => setActiveView('dashboard')}>Sổ Sách Kế Toán</h1>
                  <button onClick={() => setShowLanding(true)} className="p-1 text-gray-400 hover:text-primary-600 transition-colors" title="Về trang giới thiệu">
@@ -301,14 +367,14 @@ const App: React.FC = () => {
 
             <UserSelector />
             
-            <div className="text-xs text-center text-gray-400 mt-4 border-t border-gray-200 pt-4">
-                <p className="font-bold text-gray-600">Sổ Sách Kế Toán</p>
-                <p>Lê Minh Huấn</p>
-                <p>0912.041.201</p>
+            <div className="text-xs text-center text-gray-400 mt-4 border-t border-gray-200 pt-4 pb-4">
+                <p className="font-bold text-gray-600 uppercase">Sổ Sách Kế Toán</p>
+                <p className="mt-1">Tác giả: Lê Minh Huấn</p>
+                <p>SĐT: 0912.041.201</p>
             </div>
         </aside>
 
-        <div className="flex-1 md:ml-64">
+        <div className="flex-1 md:ml-64 flex flex-col min-h-screen">
             <header className="bg-white shadow-sm sticky top-0 z-10 md:hidden p-4 flex justify-between items-center">
                  <div className="flex items-center gap-2">
                      <button onClick={() => setShowLanding(true)} className="text-primary-700">
@@ -316,28 +382,24 @@ const App: React.FC = () => {
                      </button>
                      <h1 className="text-xl sm:text-2xl font-bold text-primary-700">Sổ Sách Kế Toán</h1>
                  </div>
-                 <div className="w-40">
-                     <select
-                        id="user-select-mobile"
-                        value={currentUser?.id || ''}
-                        onChange={(e) => setCurrentUser(employees.find(emp => emp.id === e.target.value) || null)}
-                        className="w-full p-2 text-xs border-gray-300 rounded-md shadow-sm"
-                    >
-                        {employees.map(emp => (
-                            <option key={emp.id} value={emp.id}>
-                                {emp.name} ({emp.role})
-                            </option>
-                        ))}
-                    </select>
+                 <div>
+                     <button 
+                        onClick={handleLogout}
+                        className="text-sm text-red-600 font-medium"
+                     >
+                        Đăng xuất
+                     </button>
                  </div>
             </header>
-            <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 md:pb-8">
-                {renderContent()}
+            <main className="flex-1 container mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 md:pb-8 flex flex-col">
+                <div className="flex-1">
+                   {renderContent()}
+                </div>
                 
-                {/* Mobile Footer Info */}
-                <div className="mt-8 py-6 text-center text-xs text-gray-400 md:hidden">
-                    <p className="font-bold text-gray-500">Sổ Sách Kế Toán</p>
-                    <p>Lê Minh Huấn - 0912.041.201</p>
+                {/* Main Content Footer - Visible on all screens */}
+                <div className="mt-12 pt-6 border-t border-gray-200 text-center">
+                    <p className="font-bold text-primary-700 uppercase text-sm">Sổ Sách Kế Toán</p>
+                    <p className="text-xs text-gray-500 mt-1">Tác giả: Lê Minh Huấn | SĐT: 0912.041.201</p>
                 </div>
             </main>
         </div>

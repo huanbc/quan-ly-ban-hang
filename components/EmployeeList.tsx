@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Employee, UserRole } from '../types';
 import { PlusIcon } from '../constants';
@@ -41,6 +42,8 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAdd, onUpdate,
               <thead className="bg-gray-50">
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên Nhân Viên</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tài khoản</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mật khẩu</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vai Trò</th>
                   <th scope="col" className="relative px-6 py-3"><span className="sr-only">Hành động</span></th>
                 </tr>
@@ -50,6 +53,12 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAdd, onUpdate,
                   <tr key={employee.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{employee.name}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {employee.username || '-'}
+                    </td>
+                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {employee.password || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${

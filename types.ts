@@ -1,3 +1,4 @@
+
 export enum TransactionType {
   INCOME = 'INCOME',
   EXPENSE = 'EXPENSE',
@@ -23,6 +24,8 @@ export interface Employee {
   id: string;
   name: string;
   role: UserRole;
+  username?: string;
+  password?: string;
 }
 
 export interface LineItem {

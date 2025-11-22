@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Employee, UserRole } from '../types';
 
@@ -9,24 +10,30 @@ interface Props {
 
 const AddEditEmployeeModal: React.FC<Props> = ({ onClose, onSave, employee }) => {
   const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>(UserRole.SALES);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (employee) {
       setName(employee.name);
+      setUsername(employee.username || '');
+      setPassword(employee.password || '');
       setRole(employee.role);
     }
   }, [employee]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name) {
-      setError('Tên nhân viên là bắt buộc.');
+    if (!name || !username || !password) {
+      setError('Tên nhân viên, tài khoản và mật khẩu là bắt buộc.');
       return;
     }
     const employeeData = { 
       name, 
+      username,
+      password,
       role,
     };
     if (employee) {
@@ -49,6 +56,14 @@ const AddEditEmployeeModal: React.FC<Props> = ({ onClose, onSave, employee }) =>
               <div>
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700">Tên nhân viên</label>
                 <input type="text" id="name" value={name} onChange={e => setName(e.target.value)} required className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"/>
+              </div>
+              <div>
+                <label htmlFor="username" className="block text-sm font-medium text-gray-700">Tên tài khoản</label>
+                <input type="text" id="username" value={username} onChange={e => setUsername(e.target.value)} required className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"/>
+              </div>
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">Mật khẩu</label>
+                <input type="text" id="password" value={password} onChange={e => setPassword(e.target.value)} required className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"/>
               </div>
               <div>
                 <label htmlFor="role" className="block text-sm font-medium text-gray-700">Vai trò</label>

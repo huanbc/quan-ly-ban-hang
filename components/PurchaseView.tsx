@@ -1,9 +1,10 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Product, Supplier, Transaction, TransactionType } from '../types';
-import { TrashIcon, PlusIcon } from '../constants';
+import { TrashIcon, PlusIcon, ArchiveBoxArrowDownIcon } from '../constants';
 import AddEditSupplierModal from './AddEditSupplierModal';
 import OCRPurchaseModal from './OCRPurchaseModal';
+import { formatCurrency, formatDate } from '../utils';
 
 interface PurchaseViewProps {
   products: Product[];
@@ -29,6 +30,7 @@ const PurchaseView: React.FC<PurchaseViewProps> = ({
     onAddProduct, 
     onUpdateProduct 
 }) => {
+  const [isCreating, setIsCreating] = useState(false);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -39,6 +41,9 @@ const PurchaseView: React.FC<PurchaseViewProps> = ({
   const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
   const [isSupplierDropdownOpen, setIsSupplierDropdownOpen] = useState(false);
   const supplierSearchRef = useRef<HTMLDivElement>(null);
+
+  // History List State
+  const [historySearchTerm, setHistorySearchTerm] = useState('');
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -51,6 +56,21 @@ const PurchaseView: React.FC<PurchaseViewProps> = ({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [supplierSearchRef]);
+
+  const purchaseHistory = useMemo(() => {
+    return transactions
+        .filter(t => t.category === 'Nhập hàng' || t.category === 'Trả hàng cho nhà cung cấp')
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [transactions]);
+
+  const filteredHistory = useMemo(() => {
+      if (!historySearchTerm) return purchaseHistory;
+      const lowerTerm = historySearchTerm.toLowerCase();
+      return purchaseHistory.filter(t => {
+          const supplierName = suppliers.find(s => s.id === t.supplierId)?.name.toLowerCase() || '';
+          return supplierName.includes(lowerTerm) || t.description.toLowerCase().includes(lowerTerm);
+      });
+  }, [purchaseHistory, historySearchTerm, suppliers]);
 
   const filteredSuppliers = useMemo(() => {
     if (!supplierSearchTerm) return suppliers;
@@ -79,11 +99,6 @@ const PurchaseView: React.FC<PurchaseViewProps> = ({
   const handleClearSupplier = () => {
     setSelectedSupplierId('');
     setSupplierSearchTerm('');
-  };
-
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
   };
 
   const addProductToOrder = (product: Product) => {
@@ -150,15 +165,128 @@ const PurchaseView: React.FC<PurchaseViewProps> = ({
     setOrderItems([]);
     setSelectedSupplierId('');
     setSupplierSearchTerm('');
+    setIsCreating(false); // Go back to list view
     alert("Tạo phiếu nhập hàng thành công!");
   };
+
+  const getProductGroups = (transaction: Transaction) => {
+      if (!transaction.lineItems || transaction.lineItems.length === 0) return "---";
+      
+      const categories = new Set<string>();
+      transaction.lineItems.forEach(item => {
+          const product = products.find(p => p.id === item.productId);
+          if (product && product.subCategory) {
+              categories.add(product.subCategory);
+          } else if (product) {
+              categories.add("Khác");
+          }
+      });
+      
+      const catArray = Array.from(categories);
+      if (catArray.length === 0) return "---";
+      return catArray.join(", ");
+  };
+
+  const getSupplierName = (id: string) => {
+      return suppliers.find(s => s.id === id)?.name || 'N/A';
+  };
+
+  if (!isCreating) {
+      return (
+        <div className="bg-white p-4 sm:p-6 rounded-xl shadow-lg min-h-[calc(100vh-8rem)]">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                <h2 className="text-2xl font-bold text-gray-700 flex items-center gap-2">
+                    <ArchiveBoxArrowDownIcon />
+                    Danh Sách Phiếu Nhập Hàng
+                </h2>
+                <div className="flex gap-2 w-full sm:w-auto">
+                     <button 
+                        onClick={() => setIsOCRModalOpen(true)}
+                        className="flex-1 sm:flex-none flex items-center justify-center space-x-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-100 transition-colors font-medium"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span>Quét OCR</span>
+                    </button>
+                    <button 
+                        onClick={() => setIsCreating(true)}
+                        className="flex-1 sm:flex-none flex items-center justify-center space-x-2 bg-primary-600 text-white px-4 py-2 rounded-lg shadow hover:bg-primary-700 transition-colors"
+                    >
+                        <PlusIcon />
+                        <span>Tạo Phiếu Nhập</span>
+                    </button>
+                </div>
+            </div>
+
+            <div className="mb-4">
+                <input 
+                    type="text" 
+                    placeholder="Tìm kiếm theo nhà cung cấp..." 
+                    value={historySearchTerm}
+                    onChange={e => setHistorySearchTerm(e.target.value)}
+                    className="w-full sm:w-1/3 p-2 border border-gray-300 rounded-lg"
+                />
+            </div>
+
+            <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ngày nhập</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nhà phân phối</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nhóm hàng</th>
+                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Tổng số tiền</th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {filteredHistory.length > 0 ? filteredHistory.map(t => (
+                            <tr key={t.id} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(t.date)}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-primary-700">{t.supplierId ? getSupplierName(t.supplierId) : '-'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getProductGroups(t)}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-600 text-right">{formatCurrency(t.amount)}</td>
+                            </tr>
+                        )) : (
+                            <tr>
+                                <td colSpan={4} className="text-center py-12 text-gray-500">Chưa có phiếu nhập hàng nào.</td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+             {isOCRModalOpen && (
+                <OCRPurchaseModal 
+                    onClose={() => setIsOCRModalOpen(false)}
+                    onAddTransaction={onAddTransaction}
+                    onAddProduct={onAddProduct}
+                    onUpdateProduct={onUpdateProduct}
+                    onAddSupplier={onAddSupplier}
+                    products={products}
+                    suppliers={suppliers}
+                    transactions={transactions}
+                />
+            )}
+        </div>
+      );
+  }
 
   return (
     <>
     <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-8rem)]">
       {/* Left side - Product List */}
       <div className="flex-1 lg:w-3/5 bg-white p-4 rounded-xl shadow-lg flex flex-col">
-        <div className="mb-4 flex gap-2">
+        <div className="mb-4 flex items-center gap-2">
+          <button 
+            onClick={() => setIsCreating(false)}
+            className="p-2 text-gray-500 hover:bg-gray-100 rounded-full mr-2"
+            title="Quay lại danh sách"
+          >
+             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+          </button>
           <input
             type="text"
             placeholder="Tìm kiếm sản phẩm..."
@@ -166,17 +294,6 @@ const PurchaseView: React.FC<PurchaseViewProps> = ({
             onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
           />
-          <button 
-            onClick={() => setIsOCRModalOpen(true)}
-            className="flex items-center space-x-2 bg-primary-100 text-primary-700 px-3 py-2 rounded-lg hover:bg-primary-200 transition-colors shadow-sm whitespace-nowrap"
-            title="Quét hóa đơn nhập hàng"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span className="hidden sm:inline font-medium">Quét hóa đơn</span>
-          </button>
         </div>
         <div className="flex-1 overflow-y-auto pr-2">
             {filteredProducts.length > 0 ? (
@@ -202,7 +319,7 @@ const PurchaseView: React.FC<PurchaseViewProps> = ({
 
       {/* Right side - Purchase Order */}
       <div className="lg:w-2/5 bg-white p-4 rounded-xl shadow-lg flex flex-col">
-        <h2 className="text-xl font-bold text-gray-700 mb-4 pb-2 border-b">Phiếu Nhập Hàng</h2>
+        <h2 className="text-xl font-bold text-gray-700 mb-4 pb-2 border-b">Phiếu Nhập Hàng Mới</h2>
         
         <div className="mb-4" ref={supplierSearchRef}>
           <label htmlFor="supplier-search" className="block text-sm font-medium text-gray-700 mb-1">Nhà cung cấp</label>
@@ -312,18 +429,6 @@ const PurchaseView: React.FC<PurchaseViewProps> = ({
           onClose={() => setIsAddSupplierModalOpen(false)}
           onSave={handleSaveNewSupplier}
           supplier={null}
-        />
-    )}
-    {isOCRModalOpen && (
-        <OCRPurchaseModal 
-            onClose={() => setIsOCRModalOpen(false)}
-            onAddTransaction={onAddTransaction}
-            onAddProduct={onAddProduct}
-            onUpdateProduct={onUpdateProduct}
-            onAddSupplier={onAddSupplier}
-            products={products}
-            suppliers={suppliers}
-            transactions={transactions}
         />
     )}
     </>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Product, TaxCategory } from '../types';
 
@@ -110,8 +111,19 @@ const AddEditProductModal: React.FC<Props> = ({ onClose, onSave, product }) => {
 
                <div className="grid grid-cols-2 gap-4">
                  <div>
-                  <label htmlFor="subCategory" className="block text-sm font-medium text-gray-700">Nhóm phụ</label>
-                  <input type="text" id="subCategory" value={subCategory} onChange={e => setSubCategory(e.target.value)} placeholder="VD: Linh kiện máy tính" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"/>
+                  <label htmlFor="subCategory" className="block text-sm font-medium text-gray-700">Nhóm hàng phụ</label>
+                  <input type="text" id="subCategory" value={subCategory} onChange={e => setSubCategory(e.target.value)} list="subCategorySuggestions" placeholder="VD: PC, Laptop, VPP..." className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"/>
+                  <datalist id="subCategorySuggestions">
+                      <option value="Văn phòng phẩm" />
+                      <option value="PC" />
+                      <option value="Laptop" />
+                      <option value="Điện thoại" />
+                      <option value="Linh kiện máy tính" />
+                      <option value="Thiết bị mạng" />
+                      <option value="Phụ kiện" />
+                      <option value="Máy in" />
+                      <option value="Camera" />
+                  </datalist>
                 </div>
                 <div>
                   <label htmlFor="vat" className="block text-sm font-medium text-gray-700">VAT (%)</label>

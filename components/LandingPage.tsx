@@ -44,7 +44,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
             </div>
           </div>
           <div className="mt-12 text-sm text-primary-200 opacity-80">
-            &copy; 2025 Lê Minh Huấn Technology
+             <p className="font-bold">SỔ SÁCH KẾ TOÁN</p>
+             <p>Tác giả: Lê Minh Huấn | SĐT: 0912.041.201</p>
           </div>
         </div>
 
