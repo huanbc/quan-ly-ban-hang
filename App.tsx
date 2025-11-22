@@ -7,11 +7,12 @@ import CustomerList from './components/CustomerList';
 import ProductList from './components/ProductList';
 import SupplierList from './components/SupplierList';
 import SalesView from './components/SalesView';
-import PurchaseView from './components/PurchaseView'; // New
-import EmployeeList from './components/EmployeeList'; // New
+import PurchaseView from './components/PurchaseView';
+import EmployeeList from './components/EmployeeList';
 import ReportsView from './components/ReportsView';
 import LedgerView from './components/LedgerView';
 import AddTransactionModal from './components/AddTransactionModal';
+import LandingPage from './components/LandingPage';
 import { PlusIcon, ChartIcon, ListIcon, UsersIcon, CubeIcon, TruckIcon, ShoppingCartIcon, DocumentReportIcon, BookOpenIcon, IdentificationIcon, ArchiveBoxArrowDownIcon } from './constants';
 import { generateId } from './utils';
 
@@ -41,6 +42,7 @@ const initialBusinessDetails: BusinessDetails = {
 
 
 const App: React.FC = () => {
+  const [showLanding, setShowLanding] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -247,6 +249,10 @@ const App: React.FC = () => {
     }
   }
   
+  if (showLanding) {
+    return <LandingPage onEnter={() => setShowLanding(false)} />;
+  }
+
   if (!currentUser) {
     return (
         <div className="min-h-screen bg-gray-100 flex items-center justify-center">
