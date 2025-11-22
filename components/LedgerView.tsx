@@ -18,10 +18,14 @@ interface LedgerViewProps {
 }
 
 type LedgerType = 'revenue' | 'inventory' | 'expense' | 'tax' | 'payroll' | 'cash' | 'bank';
+type PeriodType = 'year' | 'quarter' | 'month';
 
 const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, customers, suppliers, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onAddProduct }) => {
   const [activeLedger, setActiveLedger] = useState<LedgerType>('revenue');
   const [year, setYear] = useState(new Date().getFullYear());
+  const [periodType, setPeriodType] = useState<PeriodType>('year');
+  const [periodValue, setPeriodValue] = useState<number>(1);
+  
   const [selectedInventoryProduct, setSelectedInventoryProduct] = useState<string>('');
   const [isOCRModalOpen, setIsOCRModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -51,13 +55,32 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
 
   const productMap = useMemo(() => new Map(products.map(p => [p.id, p])), [products]);
 
+  // Helper to get date range based on filter
+  const getPeriodDates = () => {
+      let startDate = new Date(year, 0, 1);
+      let endDate = new Date(year, 11, 31, 23, 59, 59, 999);
+
+      if (periodType === 'quarter') {
+          const startMonth = (periodValue - 1) * 3;
+          startDate = new Date(year, startMonth, 1);
+          endDate = new Date(year, startMonth + 3, 0, 23, 59, 59, 999);
+      } else if (periodType === 'month') {
+          startDate = new Date(year, periodValue - 1, 1);
+          endDate = new Date(year, periodValue, 0, 23, 59, 59, 999);
+      }
+      return { startDate, endDate };
+  };
+
   const revenueLedgerData = useMemo(() => {
-    const revenueTransactions = transactions.filter(t => 
-        t.type === TransactionType.INCOME &&
-        new Date(t.date).getFullYear() === year &&
+    const { startDate, endDate } = getPeriodDates();
+    
+    const revenueTransactions = transactions.filter(t => {
+        const tDate = new Date(t.date);
+        return t.type === TransactionType.INCOME &&
+        tDate >= startDate && tDate <= endDate &&
         (t.category === "Bán hàng" || t.category === "Cung cấp dịch vụ") &&
         t.lineItems && t.lineItems.length > 0
-    );
+    });
 
     const ledgerRows = revenueTransactions.map(t => {
       const revenueByCategory = {
@@ -113,9 +136,11 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
     });
 
     return { rows: ledgerRows.sort((a,b) => new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime()), totals };
-  }, [transactions, year, productMap]);
+  }, [transactions, year, periodType, periodValue, productMap]);
 
   const expenseLedgerData = useMemo(() => {
+    const { startDate, endDate } = getPeriodDates();
+    
     const costCategories = {
         labor: "Chi phí nhân công",
         electricity: "Chi phí điện",
@@ -126,12 +151,13 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
     };
     const excludedCategories = ["Nhập hàng", "Khách trả hàng", "Chi phí nguyên vật liệu", "Trả nợ nhà cung cấp", "Nộp thuế", "Thanh toán lương nhân viên", "Nộp Bảo hiểm xã hội", "Nộp Bảo hiểm y tế", "Nộp Bảo hiểm thất nghiệp", "Nộp Kinh phí công đoàn"];
 
-    const expenseTransactions = transactions.filter(t => 
-        t.type === TransactionType.EXPENSE &&
-        new Date(t.date).getFullYear() === year &&
+    const expenseTransactions = transactions.filter(t => {
+        const tDate = new Date(t.date);
+        return t.type === TransactionType.EXPENSE &&
+        tDate >= startDate && tDate <= endDate &&
         !excludedCategories.includes(t.category) && 
         t.category !== costCategories.labor
-    );
+    });
 
     const ledgerRows = expenseTransactions.map(t => {
         const costs = {
@@ -162,19 +188,23 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
     });
 
     return { rows: ledgerRows.sort((a,b) => new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime()), totals };
-  }, [transactions, year]);
+  }, [transactions, year, periodType, periodValue]);
 
   const inventoryLedgerData = useMemo(() => {
     if (!selectedInventoryProduct) return null;
     const product = productMap.get(selectedInventoryProduct);
     if (!product) return null;
 
+    const { startDate, endDate } = getPeriodDates();
+
     const transactionsForProduct = transactions
         .filter(t => t.lineItems?.some(item => item.productId === selectedInventoryProduct))
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     let openingQty = product.initialStock || 0;
-    transactionsForProduct.filter(t => new Date(t.date).getFullYear() < year).forEach(t => {
+    
+    // Calculate opening quantity based on transactions BEFORE the selected period
+    transactionsForProduct.filter(t => new Date(t.date) < startDate).forEach(t => {
         const item = t.lineItems!.find(li => li.productId === selectedInventoryProduct)!;
         if (t.category === 'Bán hàng' || t.category === 'Trả hàng cho nhà cung cấp') openingQty -= item.quantity;
         else if (t.category === 'Nhập hàng' || t.category === 'Khách trả hàng') openingQty += item.quantity;
@@ -184,7 +214,11 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
     let runningQty = openingQty;
     let totalImportQty = 0, totalImportValue = 0, totalExportQty = 0, totalExportValue = 0;
 
-    transactionsForProduct.filter(t => new Date(t.date).getFullYear() === year).forEach(t => {
+    // Process transactions WITHIN the selected period
+    transactionsForProduct.filter(t => {
+        const tDate = new Date(t.date);
+        return tDate >= startDate && tDate <= endDate;
+    }).forEach(t => {
         const item = t.lineItems!.find(li => li.productId === selectedInventoryProduct)!;
         const isImport = t.category === 'Nhập hàng' || t.category === 'Khách trả hàng';
         const isExport = t.category === 'Bán hàng' || t.category === 'Trả hàng cho nhà cung cấp';
@@ -226,9 +260,10 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
         closingQty: runningQty,
         closingValue: runningQty * product.purchasePrice,
     };
-  }, [transactions, year, selectedInventoryProduct, productMap]);
+  }, [transactions, year, periodType, periodValue, selectedInventoryProduct, productMap]);
 
   const taxLedgerData = useMemo(() => {
+    const { startDate, endDate } = getPeriodDates();
     const TAX_RATES = {
         [TaxCategory.DISTRIBUTION_GOODS]: { vat: 0.01, pit: 0.005 },
         [TaxCategory.SERVICES_NO_MATERIALS]: { vat: 0.05, pit: 0.02 },
@@ -238,10 +273,10 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
         [TaxCategory.AGENCY_INSURANCE_MLM]: { vat: 0, pit: 0.05 },
     };
     
-    const calculateTaxForPeriod = (startDate: Date, endDate: Date) => {
+    const calculateTaxForPeriod = (start: Date, end: Date) => {
         const periodTransactions = transactions.filter(t => {
             const tDate = new Date(t.date);
-            return t.type === TransactionType.INCOME && tDate >= startDate && tDate <= endDate && t.lineItems;
+            return t.type === TransactionType.INCOME && tDate >= start && tDate <= end && t.lineItems;
         });
         
         let totalPayable = 0;
@@ -258,23 +293,40 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
         return totalPayable;
     };
 
-    const openingBalance = calculateTaxForPeriod(new Date(0), new Date(year - 1, 11, 31)) - transactions.filter(t => new Date(t.date).getFullYear() < year && t.category === "Nộp thuế").reduce((sum, t) => sum + t.amount, 0);
+    // Calculate opening balance before the selected period
+    // Start from epoch 0 up to startDate
+    const totalPayableBefore = calculateTaxForPeriod(new Date(0), new Date(startDate.getTime() - 1));
+    const totalPaidBefore = transactions
+        .filter(t => new Date(t.date) < startDate && t.category === "Nộp thuế")
+        .reduce((sum, t) => sum + t.amount, 0);
+    
+    const openingBalance = totalPayableBefore - totalPaidBefore;
 
-    const quarterlyPayable = [1, 2, 3, 4].map(q => {
-        const startDate = new Date(year, (q - 1) * 3, 1);
-        const endDate = new Date(year, q * 3, 0);
-        return {
-            date: endDate,
-            description: `Phải nộp thuế Quý ${q}/${year}`,
-            payable: calculateTaxForPeriod(startDate, endDate),
-            paid: 0,
-            docNumber: '',
-            transaction: null, // Computed row, no transaction
-        };
-    });
+    // Generate Quarterly obligations that fall within the selected period
+    const quarterlyPayableRows = [];
+    for (let q = 1; q <= 4; q++) {
+        const qStart = new Date(year, (q - 1) * 3, 1);
+        const qEnd = new Date(year, q * 3, 0, 23, 59, 59, 999);
+        
+        // Only include if the quarter end date is within the selected period (approx)
+        // or overlapping. Here we check if the obligation "date" (qEnd) is inside.
+        if (qEnd >= startDate && qEnd <= endDate) {
+             quarterlyPayableRows.push({
+                date: qEnd,
+                description: `Phải nộp thuế Quý ${q}/${year}`,
+                payable: calculateTaxForPeriod(qStart, qEnd),
+                paid: 0,
+                docNumber: '',
+                transaction: null,
+            });
+        }
+    }
 
     const taxPayments = transactions
-        .filter(t => new Date(t.date).getFullYear() === year && t.category === "Nộp thuế")
+        .filter(t => {
+            const tDate = new Date(t.date);
+            return tDate >= startDate && tDate <= endDate && t.category === "Nộp thuế";
+        })
         .map(t => ({
             date: new Date(t.date),
             description: t.description,
@@ -284,7 +336,7 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
             transaction: t,
         }));
     
-    const ledgerRows = [...quarterlyPayable, ...taxPayments]
+    const ledgerRows = [...quarterlyPayableRows, ...taxPayments]
         .filter(row => row.payable > 0 || row.paid > 0)
         .sort((a, b) => a.date.getTime() - b.date.getTime());
 
@@ -305,9 +357,10 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
         totals,
         closingBalance: openingBalance + totals.payable - totals.paid,
     };
-  }, [transactions, year, productMap]);
+  }, [transactions, year, periodType, periodValue, productMap]);
   
   const payrollLedgerData = useMemo(() => {
+    const { startDate, endDate } = getPeriodDates();
     const RATES = {
         BHXH: 0.255, // 8% NLĐ + 17.5% NSDLĐ
         BHYT: 0.045, // 1.5% NLĐ + 3% NSDLĐ
@@ -315,8 +368,8 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
         KPCD: 0.02   // 2% NSDLĐ
     };
 
-    const calculateBalanceForPeriod = (endDate: Date) => {
-        const periodTransactions = transactions.filter(t => new Date(t.date) <= endDate);
+    const calculateBalanceForPeriod = (end: Date) => {
+        const periodTransactions = transactions.filter(t => new Date(t.date) <= end);
         
         const grossSalaryPayable = periodTransactions
             .filter(t => t.category === 'Chi phí nhân công')
@@ -347,16 +400,19 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
         };
     };
 
-    const openingBalance = calculateBalanceForPeriod(new Date(year - 1, 11, 31));
+    // Opening balance is calculated up to the day before startDate
+    const openingBalance = calculateBalanceForPeriod(new Date(startDate.getTime() - 1));
     
-    const yearTransactions = transactions
-        .filter(t => new Date(t.date).getFullYear() === year && [
+    const periodTransactions = transactions
+        .filter(t => {
+            const tDate = new Date(t.date);
+            return tDate >= startDate && tDate <= endDate && [
             'Chi phí nhân công', 'Thanh toán lương nhân viên', 'Nộp Bảo hiểm xã hội',
             'Nộp Bảo hiểm y tế', 'Nộp Bảo hiểm thất nghiệp', 'Nộp Kinh phí công đoàn'
-        ].includes(t.category))
+        ].includes(t.category)})
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    const ledgerRows = yearTransactions.map(t => {
+    const ledgerRows = periodTransactions.map(t => {
         const row = {
             transaction: t,
             docDate: t.date, docNumber: t.id.substring(0, 8).toUpperCase(), description: t.description,
@@ -400,21 +456,26 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
     };
 
     return { openingBalance, rows: ledgerRows, totals, closingBalance };
-  }, [transactions, year]);
+  }, [transactions, year, periodType, periodValue]);
   
   const cashLedgerData = useMemo(() => {
+    const { startDate, endDate } = getPeriodDates();
+    
     // Treat transactions without a paymentMethod as 'cash' for backward compatibility
-    const transactionsBefore = transactions.filter(t => new Date(t.date).getFullYear() < year && (t.paymentMethod === 'cash' || !t.paymentMethod));
+    const transactionsBefore = transactions.filter(t => new Date(t.date) < startDate && (t.paymentMethod === 'cash' || !t.paymentMethod));
     const openingBalance = transactionsBefore.reduce((balance, t) => {
         return t.type === TransactionType.INCOME ? balance + t.amount : balance - t.amount;
     }, 0);
 
-    const yearTransactions = transactions
-        .filter(t => new Date(t.date).getFullYear() === year && (t.paymentMethod === 'cash' || !t.paymentMethod))
+    const periodTransactions = transactions
+        .filter(t => {
+            const tDate = new Date(t.date);
+            return tDate >= startDate && tDate <= endDate && (t.paymentMethod === 'cash' || !t.paymentMethod)
+        })
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     let runningBalance = openingBalance;
-    const ledgerRows = yearTransactions.map(t => {
+    const ledgerRows = periodTransactions.map(t => {
         const income = t.type === TransactionType.INCOME ? t.amount : 0;
         const expense = t.type === TransactionType.EXPENSE ? t.amount : 0;
         runningBalance += income - expense;
@@ -446,20 +507,25 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
         totals,
         closingBalance,
     };
-  }, [transactions, year]);
+  }, [transactions, year, periodType, periodValue]);
 
   const bankLedgerData = useMemo(() => {
-    const transactionsBefore = transactions.filter(t => new Date(t.date).getFullYear() < year && t.paymentMethod === 'bank');
+    const { startDate, endDate } = getPeriodDates();
+
+    const transactionsBefore = transactions.filter(t => new Date(t.date) < startDate && t.paymentMethod === 'bank');
     const openingBalance = transactionsBefore.reduce((balance, t) => {
         return t.type === TransactionType.INCOME ? balance + t.amount : balance - t.amount;
     }, 0);
 
-    const yearTransactions = transactions
-        .filter(t => new Date(t.date).getFullYear() === year && t.paymentMethod === 'bank')
+    const periodTransactions = transactions
+        .filter(t => {
+            const tDate = new Date(t.date);
+            return tDate >= startDate && tDate <= endDate && t.paymentMethod === 'bank'
+        })
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     let runningBalance = openingBalance;
-    const ledgerRows = yearTransactions.map(t => {
+    const ledgerRows = periodTransactions.map(t => {
         const income = t.type === TransactionType.INCOME ? t.amount : 0;
         const expense = t.type === TransactionType.EXPENSE ? t.amount : 0;
         runningBalance += income - expense;
@@ -490,10 +556,12 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
         totals,
         closingBalance,
     };
-  }, [transactions, year]);
+  }, [transactions, year, periodType, periodValue]);
 
 
   const handleExport = () => {
+    const timeLabel = periodType === 'year' ? `${year}` : periodType === 'quarter' ? `Q${periodValue}-${year}` : `T${periodValue}-${year}`;
+    
     switch (activeLedger) {
         case 'revenue': {
             const headers = [
@@ -513,7 +581,7 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
                 "Tổng cộng", "", "", "", revenueLedgerData.totals[TaxCategory.DISTRIBUTION_GOODS], revenueLedgerData.totals[TaxCategory.SERVICES_NO_MATERIALS],
                 revenueLedgerData.totals[TaxCategory.PRODUCTION_TRANSPORT_SERVICES_WITH_GOODS], revenueLedgerData.totals.other, ""
             ]);
-            exportToCsv(`so-doanh-thu-s1-hkd-${year}`, headers, data);
+            exportToCsv(`so-doanh-thu-s1-hkd-${timeLabel}`, headers, data);
             break;
         }
         case 'expense': {
@@ -532,7 +600,7 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
                 expenseLedgerData.totals.costs.water, expenseLedgerData.totals.costs.telecom, expenseLedgerData.totals.costs.rent,
                 expenseLedgerData.totals.costs.management, expenseLedgerData.totals.costs.other
             ]);
-            exportToCsv(`so-chi-phi-s3-hkd-${year}`, headers, data);
+            exportToCsv(`so-chi-phi-s3-hkd-${timeLabel}`, headers, data);
             break;
         }
         case 'inventory': {
@@ -547,7 +615,7 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
                 row.importQty || '', row.importValue || '', row.exportQty || '', row.exportValue || '',
                 row.closingQty, row.closingValue
             ]);
-            exportToCsv(`so-kho-s2-hkd-${inventoryLedgerData.product.name}-${year}`, headers, data);
+            exportToCsv(`so-kho-s2-hkd-${inventoryLedgerData.product.name}-${timeLabel}`, headers, data);
             break;
         }
         case 'tax': {
@@ -555,7 +623,7 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
             const data = taxLedgerData.rows.map(row => [
                 formatDate(row.date.toISOString()), row.docNumber || '', row.description, row.payable || '', row.paid || '', row.balance
             ]);
-            exportToCsv(`so-thue-s4-hkd-${year}`, headers, data);
+            exportToCsv(`so-thue-s4-hkd-${timeLabel}`, headers, data);
             break;
         }
         case 'payroll': {
@@ -575,7 +643,7 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
                 row.payable.bhtn || '', row.paid.bhtn || '',
                 row.payable.kpcd || '', row.paid.kpcd || '',
             ]);
-            exportToCsv(`so-luong-s5-hkd-${year}`, headers, data);
+            exportToCsv(`so-luong-s5-hkd-${timeLabel}`, headers, data);
             break;
         }
         case 'cash': {
@@ -591,7 +659,7 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
                 row.balance,
                 row.notes
             ]);
-            exportToCsv(`so-quy-tien-mat-s6-hkd-${year}`, headers, data);
+            exportToCsv(`so-quy-tien-mat-s6-hkd-${timeLabel}`, headers, data);
             break;
         }
         case 'bank': {
@@ -606,7 +674,7 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
                 row.balance,
                 row.notes
             ]);
-            exportToCsv(`so-tien-gui-ngan-hang-s7-hkd-${year}`, headers, data);
+            exportToCsv(`so-tien-gui-ngan-hang-s7-hkd-${timeLabel}`, headers, data);
             break;
         }
     }
@@ -634,7 +702,7 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
             <h2 className="text-xl font-bold uppercase">Sổ chi tiết doanh thu bán hàng hóa, dịch vụ (Mẫu S1-HKD)</h2>
             <button
                 onClick={() => setIsOCRModalOpen(true)}
-                className="absolute right-0 top-0 flex items-center space-x-2 bg-primary-100 text-primary-700 px-3 py-1.5 rounded-lg shadow-sm hover:bg-primary-200 transition-colors text-sm"
+                className="absolute right-0 top-0 flex items-center space-x-2 bg-primary-100 text-primary-700 px-3 py-1.5 rounded-lg shadow-sm hover:bg-primary-200 transition-colors text-sm hidden sm:flex"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -660,7 +728,7 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
                             {renderActions(row.transaction)}
                         </tr>
                      )) : (
-                        <tr><td colSpan={10} className="text-center p-8 text-gray-500">Không có dữ liệu doanh thu cho năm {year}.</td></tr>
+                        <tr><td colSpan={10} className="text-center p-8 text-gray-500">Không có dữ liệu doanh thu trong kỳ này.</td></tr>
                      )}
                 </tbody>
                 <tfoot className="bg-gray-100 font-bold">
@@ -698,7 +766,7 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
                             {renderActions(row.transaction)}
                         </tr>
                     )) : (
-                        <tr><td colSpan={13} className="text-center p-8 text-gray-500">Không có dữ liệu chi phí cho năm {year}.</td></tr>
+                        <tr><td colSpan={13} className="text-center p-8 text-gray-500">Không có dữ liệu chi phí trong kỳ này.</td></tr>
                     )}
                 </tbody>
                 <tfoot className="bg-gray-100 font-bold">
@@ -1023,8 +1091,8 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
   return (
     <div className="space-y-6">
        <div className="bg-white p-4 rounded-xl shadow-lg">
-        <div className="flex flex-col sm:flex-row justify-between items-center">
-             <div className="flex space-x-2 border-b flex-wrap">
+        <div className="flex flex-col xl:flex-row justify-between items-center gap-4">
+             <div className="flex space-x-2 border-b flex-wrap justify-center xl:justify-start">
                 <button onClick={() => setActiveLedger('revenue')} className={`px-4 py-2 text-sm font-semibold ${activeLedger === 'revenue' ? 'border-b-2 border-primary-600 text-primary-600' : 'text-gray-500'}`}>Sổ Doanh Thu (S1-HKD)</button>
                 <button onClick={() => setActiveLedger('inventory')} className={`px-4 py-2 text-sm font-semibold ${activeLedger === 'inventory' ? 'border-b-2 border-primary-600 text-primary-600' : 'text-gray-500'}`}>Sổ Kho (S2-HKD)</button>
                 <button onClick={() => setActiveLedger('expense')} className={`px-4 py-2 text-sm font-semibold ${activeLedger === 'expense' ? 'border-b-2 border-primary-600 text-primary-600' : 'text-gray-500'}`}>Sổ Chi Phí (S3-HKD)</button>
@@ -1033,12 +1101,42 @@ const LedgerView: React.FC<LedgerViewProps> = ({ transactions, products, custome
                 <button onClick={() => setActiveLedger('cash')} className={`px-4 py-2 text-sm font-semibold ${activeLedger === 'cash' ? 'border-b-2 border-primary-600 text-primary-600' : 'text-gray-500'}`}>Sổ Quỹ Tiền Mặt (S6-HKD)</button>
                 <button onClick={() => setActiveLedger('bank')} className={`px-4 py-2 text-sm font-semibold ${activeLedger === 'bank' ? 'border-b-2 border-primary-600 text-primary-600' : 'text-gray-500'}`}>Sổ Tiền Gửi NH (S7-HKD)</button>
             </div>
-            <div className="flex items-center gap-4 mt-4 sm:mt-0">
-                <div>
-                     <label htmlFor="ledgerYear" className="block text-xs font-medium text-gray-600">Năm</label>
-                     <input type="number" id="ledgerYear" value={year} onChange={handleYearChange} className="p-2 w-32 border border-gray-300 rounded-lg"/>
+            
+            <div className="flex items-center gap-2 flex-wrap justify-center">
+                <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                    <select 
+                        value={periodType} 
+                        onChange={e => setPeriodType(e.target.value as PeriodType)}
+                        className="bg-transparent border-none text-sm font-medium text-gray-700 focus:ring-0 cursor-pointer py-1 pl-2 pr-8"
+                    >
+                        <option value="year">Năm</option>
+                        <option value="quarter">Quý</option>
+                        <option value="month">Tháng</option>
+                    </select>
+                    
+                    {periodType !== 'year' && (
+                        <select 
+                            value={periodValue} 
+                            onChange={e => setPeriodValue(parseInt(e.target.value))}
+                            className="bg-white border border-gray-200 text-sm rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 ml-2 py-1 pl-2 pr-8"
+                        >
+                            {periodType === 'quarter' ? (
+                                [1, 2, 3, 4].map(q => <option key={q} value={q}>Quý {q}</option>)
+                            ) : (
+                                Array.from({length: 12}, (_, i) => i + 1).map(m => <option key={m} value={m}>Tháng {m}</option>)
+                            )}
+                        </select>
+                    )}
+                    
+                    <input 
+                        type="number" 
+                        value={year} 
+                        onChange={handleYearChange} 
+                        className="w-20 bg-white border border-gray-200 text-sm rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 ml-2 py-1 px-2"
+                    />
                 </div>
-                 <button onClick={handleExport} className="self-end flex items-center space-x-2 text-sm bg-green-600 text-white px-3 py-2 rounded-lg shadow hover:bg-green-700">
+
+                 <button onClick={handleExport} className="flex items-center space-x-2 text-sm bg-green-600 text-white px-3 py-1.5 rounded-lg shadow hover:bg-green-700 transition-colors">
                     <DownloadIcon /><span>Xuất Excel</span>
                 </button>
             </div>
