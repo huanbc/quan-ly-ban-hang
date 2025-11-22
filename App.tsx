@@ -42,9 +42,13 @@ const App: React.FC = () => {
   const [businessDetails, setBusinessDetails] = useState<BusinessDetails>(initialBusinessDetails);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showSalesModal, setShowSalesModal] = useState(false);
   const [showLedgerModal, setShowLedgerModal] = useState(false);
   const [activeView, setActiveView] = useState<View>('dashboard');
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
+  
+  // Sidebar state
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   // Login State
   const [loginUsername, setLoginUsername] = useState('');
@@ -194,6 +198,9 @@ const App: React.FC = () => {
         } else {
             setActiveView(view);
         }
+        if (!mobile) {
+            setIsSidebarOpen(false);
+        }
     };
 
     if (mobile) {
@@ -212,26 +219,26 @@ const App: React.FC = () => {
             onClick={handleClick}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${isActive ? 'bg-primary-100 text-primary-700 font-bold' : 'text-gray-600 hover:bg-gray-100'}`}
         >
-            {icon}
-            <span className="text-sm">{label}</span>
+            <div className="flex-shrink-0">{icon}</div>
+            <span className={`text-sm transition-opacity duration-200 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>{label}</span>
         </button>
     );
   };
   
   const UserSelector = () => (
     <div className="mt-auto pt-4 border-t border-gray-200">
-        <div className="flex items-center gap-3 px-2 mb-3">
-             <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold">
+        <div className={`flex items-center gap-3 px-2 mb-3 ${!isSidebarOpen ? 'justify-center' : ''}`}>
+             <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold flex-shrink-0">
                  {currentUser?.name.charAt(0)}
              </div>
-             <div className="overflow-hidden">
+             <div className={`overflow-hidden transition-all duration-200 ${isSidebarOpen ? 'w-auto opacity-100' : 'w-0 opacity-0 hidden'}`}>
                  <p className="text-sm font-medium text-gray-700 truncate">{currentUser?.name}</p>
                  <p className="text-xs text-gray-500 truncate">{currentUser?.role}</p>
              </div>
         </div>
          <button
             onClick={handleLogout}
-            className="w-full py-2 text-sm text-center text-red-600 hover:bg-red-50 rounded-md transition-colors"
+            className={`w-full py-2 text-sm text-center text-red-600 hover:bg-red-50 rounded-md transition-colors ${!isSidebarOpen ? 'opacity-0 hidden' : 'opacity-100'}`}
         >
             Đăng xuất
         </button>
@@ -252,7 +259,6 @@ const App: React.FC = () => {
     switch (activeView) {
       case 'dashboard': return <Dashboard transactions={transactions} customers={customers} suppliers={suppliers} currentUser={currentUser} businessDetails={businessDetails} onUpdateBusinessDetails={setBusinessDetails} />;
       case 'transactions': return <TransactionList transactions={sortedTransactions} onDelete={deleteTransaction} customers={customers} suppliers={suppliers} products={products} />;
-      case 'sales': return <SalesView products={products} customers={customers} onAddTransaction={addTransaction} onAddCustomer={customerOps.add} />;
       case 'purchase': return <PurchaseView products={products} suppliers={suppliers} transactions={transactions} onAddTransaction={addTransaction} onAddSupplier={supplierOps.add} onAddProduct={productOps.add} onUpdateProduct={productOps.update} />;
       case 'customers': return <CustomerList customers={customers} transactions={transactions} onAdd={customerOps.add} onUpdate={customerOps.update} onDelete={customerOps.delete} />;
       case 'products': return <ProductList products={products} onAdd={productOps.add} onUpdate={productOps.update} onDelete={productOps.delete} onBatchAdd={productOps.batchAdd} transactions={transactions} suppliers={suppliers} />;
@@ -335,16 +341,25 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen text-gray-800 flex">
-        {/* Sidebar for Desktop */}
-        <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 p-4 space-y-2 fixed h-full overflow-y-auto">
+        {/* Sidebar for Desktop - Sliding Drawer Style */}
+        <aside 
+            className={`hidden md:flex flex-col fixed top-0 left-0 h-full z-40 bg-white border-r border-gray-200 p-4 space-y-2 overflow-y-auto transition-all duration-300 ease-in-out shadow-xl ${
+                isSidebarOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-[15rem]' // Keep 1rem visible
+            }`}
+            onMouseEnter={() => setIsSidebarOpen(true)}
+            onMouseLeave={() => setIsSidebarOpen(false)}
+        >
+            {/* Decorative strip when closed */}
+            <div className={`absolute right-0 top-0 bottom-0 w-4 cursor-pointer ${isSidebarOpen ? 'hidden' : 'block'}`} />
+
             <div className="px-2 mb-4 flex items-center justify-between">
-                 <h1 className="text-lg font-bold text-primary-700 cursor-pointer" onClick={() => setActiveView('dashboard')}>Sổ Sách Kế Toán</h1>
-                 <button onClick={() => setShowLanding(true)} className="p-1 text-gray-400 hover:text-primary-600 transition-colors" title="Về trang giới thiệu">
+                 <h1 className={`text-lg font-bold text-primary-700 cursor-pointer transition-opacity duration-200 ${isSidebarOpen ? 'opacity-100' : 'opacity-0'}`} onClick={() => setActiveView('dashboard')}>Sổ Sách Kế Toán</h1>
+                 <button onClick={() => setShowLanding(true)} className={`p-1 text-gray-400 hover:text-primary-600 transition-colors ${!isSidebarOpen ? 'opacity-0' : ''}`} title="Về trang giới thiệu">
                     <HomeIcon />
                  </button>
             </div>
             <NavItem view="dashboard" label="Tổng Quan" icon={<ChartIcon />} />
-            <NavItem view="sales" label="Bán Hàng" icon={<ShoppingCartIcon />} />
+            <NavItem view="sales" label="Bán Hàng" icon={<ShoppingCartIcon />} onClick={() => setShowSalesModal(true)} />
             <NavItem view="purchase" label="Nhập Hàng" icon={<ArchiveBoxArrowDownIcon />} />
             <NavItem view="transactions" label="Giao Dịch" icon={<ListIcon />} />
             <NavItem view="customers" label="Khách Hàng" icon={<UsersIcon />} />
@@ -356,8 +371,11 @@ const App: React.FC = () => {
              
             {(currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.ACCOUNTANT) && (
                 <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="w-full mt-4 flex items-center justify-center space-x-2 bg-primary-600 text-white px-4 py-3 rounded-lg shadow-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-transform hover:scale-105"
+                    onClick={() => {
+                        setIsModalOpen(true);
+                        setIsSidebarOpen(false);
+                    }}
+                    className={`w-full mt-4 flex items-center justify-center space-x-2 bg-primary-600 text-white px-4 py-3 rounded-lg shadow-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-transform hover:scale-105 ${!isSidebarOpen ? 'opacity-0' : 'opacity-100'}`}
                     aria-label="Thêm giao dịch mới"
                 >
                     <PlusIcon />
@@ -367,14 +385,14 @@ const App: React.FC = () => {
 
             <UserSelector />
             
-            <div className="text-xs text-center text-gray-400 mt-4 border-t border-gray-200 pt-4 pb-4">
+            <div className={`text-xs text-center text-gray-400 mt-4 border-t border-gray-200 pt-4 pb-4 transition-opacity duration-200 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
                 <p className="font-bold text-gray-600 uppercase">Sổ Sách Kế Toán</p>
                 <p className="mt-1">Tác giả: Lê Minh Huấn</p>
                 <p>SĐT: 0912.041.201</p>
             </div>
         </aside>
 
-        <div className="flex-1 md:ml-64 flex flex-col min-h-screen">
+        <div className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ${isSidebarOpen ? 'md:ml-64' : 'md:ml-4'}`}>
             <header className="bg-white shadow-sm sticky top-0 z-10 md:hidden p-4 flex justify-between items-center">
                  <div className="flex items-center gap-2">
                      <button onClick={() => setShowLanding(true)} className="text-primary-700">
@@ -407,7 +425,7 @@ const App: React.FC = () => {
       {/* Bottom Nav for Mobile */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 grid grid-cols-5 gap-1 p-1 z-20 md:hidden">
         <NavItem view="dashboard" label="Tổng quan" icon={<ChartIcon />} mobile />
-        <NavItem view="sales" label="Bán Hàng" icon={<ShoppingCartIcon />} mobile />
+        <NavItem view="sales" label="Bán Hàng" icon={<ShoppingCartIcon />} onClick={() => setShowSalesModal(true)} mobile />
         <NavItem view="purchase" label="Nhập hàng" icon={<ArchiveBoxArrowDownIcon />} mobile />
         <NavItem view="products" label="Hàng hóa" icon={<CubeIcon />} mobile />
         <NavItem view="reports" label="Báo cáo" icon={<DocumentReportIcon />} mobile />
@@ -444,6 +462,29 @@ const App: React.FC = () => {
                         onUpdateTransaction={updateTransaction} 
                         onDeleteTransaction={deleteTransaction} 
                         onAddProduct={productOps.add} 
+                    />
+                 </div>
+            </div>
+        </div>
+      )}
+
+      {/* Sales Popup Modal */}
+      {showSalesModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white w-full h-full max-w-[95vw] max-h-[90vh] rounded-xl shadow-2xl overflow-hidden flex flex-col">
+                 <div className="flex justify-between items-center p-4 border-b bg-gray-50">
+                    <h2 className="text-xl font-bold text-primary-700 flex items-center gap-2">
+                        <ShoppingCartIcon />
+                        Bán Hàng
+                    </h2>
+                    <button onClick={() => setShowSalesModal(false)} className="text-gray-500 hover:text-red-500 text-2xl transition-colors">&times;</button>
+                 </div>
+                 <div className="flex-1 overflow-hidden bg-gray-50 p-4">
+                    <SalesView 
+                        products={products} 
+                        customers={customers} 
+                        onAddTransaction={addTransaction} 
+                        onAddCustomer={customerOps.add} 
                     />
                  </div>
             </div>
