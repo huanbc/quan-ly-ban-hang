@@ -17,10 +17,12 @@ export default defineConfig(({ mode }) => {
       define: {
         // Định nghĩa process.env để tránh lỗi 'process is not defined' ở runtime
         'process.env': {
-            API_KEY: env.API_KEY
+            API_KEY: env.API_KEY,
+            CLIENT_ID: env.CLIENT_ID || '773318531811-97trh586dltio36pf1inbdd20saa7imj.apps.googleusercontent.com'
         },
         // Vẫn giữ fallback này để tương thích ngược nếu code gọi trực tiếp process.env.API_KEY
         'process.env.API_KEY': JSON.stringify(env.API_KEY),
+        'process.env.CLIENT_ID': JSON.stringify(env.CLIENT_ID || '773318531811-97trh586dltio36pf1inbdd20saa7imj.apps.googleusercontent.com'),
       }
     };
 });

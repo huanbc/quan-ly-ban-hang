@@ -1,4 +1,6 @@
 
+
+
 export enum TransactionType {
   INCOME = 'INCOME',
   EXPENSE = 'EXPENSE',
@@ -95,4 +97,14 @@ export interface BusinessDetails {
   address: string;
   phone: string;
   email: string;
+}
+
+export interface AppData {
+    transactions: Transaction[];
+    customers: Customer[];
+    products: Product[];
+    suppliers: Supplier[];
+    employees: Employee[];
+    businessDetails: BusinessDetails;
+    updatedAt: string;
 }

@@ -1,8 +1,5 @@
-
-
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Transaction, Customer, Product, Supplier, Employee, UserRole, BusinessDetails } from './types';
+import { Transaction, Customer, Product, Supplier, Employee, UserRole, BusinessDetails, AppData } from './types';
 import Dashboard from './components/Dashboard';
 import TransactionList from './components/TransactionList';
 import PurchaseView from './components/PurchaseView';
@@ -15,13 +12,14 @@ import EmployeeList from './components/EmployeeList';
 import AddTransactionModal from './components/AddTransactionModal';
 import SalesView from './components/SalesView';
 import LandingPage from './components/LandingPage';
-import { PlusIcon, ChartIcon, ListIcon, UsersIcon, CubeIcon, TruckIcon, ShoppingCartIcon, DocumentReportIcon, BookOpenIcon, IdentificationIcon, ArchiveBoxArrowDownIcon, HomeIcon, CurrencyDollarIcon } from './constants';
+import DataBackupView from './components/DataBackupView';
+import { PlusIcon, ChartIcon, ListIcon, UsersIcon, CubeIcon, TruckIcon, ShoppingCartIcon, DocumentReportIcon, BookOpenIcon, IdentificationIcon, ArchiveBoxArrowDownIcon, HomeIcon, CurrencyDollarIcon, CloudArrowUpIcon } from './constants';
 import { generateId } from './utils';
 
-type View = 'dashboard' | 'transactions' | 'customers' | 'products' | 'suppliers' | 'sales' | 'purchase' | 'reports' | 'ledger' | 'employees';
+type View = 'dashboard' | 'transactions' | 'customers' | 'products' | 'suppliers' | 'sales' | 'purchase' | 'reports' | 'ledger' | 'employees' | 'backup';
 
 const initialBusinessDetails: BusinessDetails = {
-    taxpayerName: 'Lê Minh Huấn',
+    taxpayerName: 'Hoàng Văn Phan',
     storeName: 'CỬA HÀNG KINH DOANH',
     bankAccount: '',
     taxId: '',
@@ -29,7 +27,7 @@ const initialBusinessDetails: BusinessDetails = {
       { code: '47110', name: 'Bán lẻ lương thực, thực phẩm, đồ uống, thuốc lá, thuốc lào chiếm tỷ trọng lớn trong các cửa hàng kinh doanh tổng hợp' },
     ],
     address: '',
-    phone: '0912.041.201',
+    phone: '',
     email: '',
 };
 
@@ -200,6 +198,7 @@ const App: React.FC = () => {
     ledger: [UserRole.ADMIN, UserRole.ACCOUNTANT],
     reports: [UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.SALES, UserRole.WAREHOUSE],
     employees: [UserRole.ADMIN],
+    backup: [UserRole.ADMIN],
   };
   
   const hasPermission = (view: View) => {
@@ -213,6 +212,29 @@ const App: React.FC = () => {
         setActiveView('dashboard');
     }
   }, [currentUser, activeView]);
+
+  // Backup Data Helpers
+  const getCurrentData = (): AppData => {
+      return {
+          transactions,
+          customers,
+          products,
+          suppliers,
+          employees,
+          businessDetails,
+          updatedAt: new Date().toISOString()
+      };
+  };
+
+  const onRestoreData = (data: AppData) => {
+      if (data.transactions) setTransactions(data.transactions);
+      if (data.customers) setCustomers(data.customers);
+      if (data.products) setProducts(data.products);
+      if (data.suppliers) setSuppliers(data.suppliers);
+      if (data.employees) setEmployees(data.employees);
+      if (data.businessDetails) setBusinessDetails(data.businessDetails);
+      alert("Khôi phục dữ liệu thành công!");
+  };
 
 
   const NavItem = ({ view, label, icon, mobile = false, onClick }: { view: View, label: string, icon: React.ReactElement, mobile?: boolean, onClick?: () => void }) => {
@@ -296,6 +318,7 @@ const App: React.FC = () => {
       case 'reports': return <ReportsView transactions={transactions} customers={customers} suppliers={suppliers} products={products} currentUser={currentUser}/>;
       case 'ledger': return <LedgerView transactions={transactions} products={products} customers={customers} suppliers={suppliers} onAddTransaction={addTransaction} onUpdateTransaction={updateTransaction} onDeleteTransaction={deleteTransaction} onAddProduct={productOps.add} />;
       case 'employees': return <EmployeeList employees={employees} onAdd={employeeOps.add} onUpdate={employeeOps.update} onDelete={employeeOps.delete} />;
+      case 'backup': return <DataBackupView getCurrentData={getCurrentData} onRestoreData={onRestoreData} />;
       default: return <Dashboard transactions={transactions} customers={customers} suppliers={suppliers} currentUser={currentUser} businessDetails={businessDetails} onUpdateBusinessDetails={setBusinessDetails} />;
     }
   }
@@ -421,6 +444,7 @@ const App: React.FC = () => {
 
             <NavItem view="ledger" label="Sổ Sách" icon={<BookOpenIcon />} onClick={() => setShowLedgerModal(true)} />
             <NavItem view="reports" label="Báo Cáo" icon={<DocumentReportIcon />} />
+            <NavItem view="backup" label="Sao lưu dữ liệu" icon={<CloudArrowUpIcon />} />
             <NavItem view="employees" label="Nhân Viên" icon={<IdentificationIcon />} />
              
             {(currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SALES) && (
