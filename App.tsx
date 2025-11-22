@@ -13,31 +13,22 @@ import ReportsView from './components/ReportsView';
 import LedgerView from './components/LedgerView';
 import AddTransactionModal from './components/AddTransactionModal';
 import LandingPage from './components/LandingPage';
-import { PlusIcon, ChartIcon, ListIcon, UsersIcon, CubeIcon, TruckIcon, ShoppingCartIcon, DocumentReportIcon, BookOpenIcon, IdentificationIcon, ArchiveBoxArrowDownIcon } from './constants';
+import { PlusIcon, ChartIcon, ListIcon, UsersIcon, CubeIcon, TruckIcon, ShoppingCartIcon, DocumentReportIcon, BookOpenIcon, IdentificationIcon, ArchiveBoxArrowDownIcon, HomeIcon } from './constants';
 import { generateId } from './utils';
 
 type View = 'dashboard' | 'transactions' | 'customers' | 'products' | 'suppliers' | 'sales' | 'purchase' | 'reports' | 'ledger' | 'employees';
 
 const initialBusinessDetails: BusinessDetails = {
-    taxpayerName: 'Hoàng Văn Phan',
-    storeName: 'HTP STORE',
-    bankAccount: '9385372863',
-    taxId: '022090004221',
+    taxpayerName: 'Lê Minh Huấn',
+    storeName: 'CỬA HÀNG KINH DOANH',
+    bankAccount: '',
+    taxId: '',
     businessLines: [
-      { code: '82191', name: 'Photo, chuẩn bị tài liệu' },
-      { code: '47420', name: 'Bán lẻ thiết bị nghe nhìn trong các cửa hàng chuyên doanh' },
-      { code: '47591', name: 'Bán lẻ đồ điện gia dụng, đèn và bộ đèn điện trong các cửa hàng chuyên doanh' },
-      { code: '47610', name: 'Bán lẻ sách, báo, tạp chí văn phòng phẩm trong các cửa hàng chuyên doanh' },
-      { code: '47411', name: 'Bán lẻ máy vi tính, thiết bị ngoại vi, phần mềm trong các cửa hàng chuyên doanh' },
-      { code: '62020', name: 'Tư vấn máy vi tính và quản trị hệ thống máy vi tính' },
-      { code: '62090', name: 'Hoạt động dịch vụ công nghệ thông tin và dịch vụ khác liên quan đến máy vi tính' },
-      { code: '63120', name: 'Cổng thông tin' },
-      { code: '95110', name: 'Sửa chữa máy vi tính và thiết bị ngoại vi' },
-      { code: '18120', name: 'Dịch vụ liên quan đến in' },
+      { code: '47110', name: 'Bán lẻ lương thực, thực phẩm, đồ uống, thuốc lá, thuốc lào chiếm tỷ trọng lớn trong các cửa hàng kinh doanh tổng hợp' },
     ],
-    address: 'Thôn Đồng Giàng B, Xã Lương Minh, Huyện Ba Chẽ, Tỉnh Quảng Ninh',
-    phone: '0385372863',
-    email: 'contact.htpgroup@gmail.com',
+    address: '',
+    phone: '0912.041.201',
+    email: '',
 };
 
 
@@ -280,8 +271,11 @@ const App: React.FC = () => {
     <div className="bg-gray-50 min-h-screen text-gray-800 flex">
         {/* Sidebar for Desktop */}
         <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 p-4 space-y-2 fixed h-full">
-            <div className="px-2 mb-4">
-                 <h1 className="text-lg font-bold text-primary-700">Sổ Sách Kế Toán</h1>
+            <div className="px-2 mb-4 flex items-center justify-between">
+                 <h1 className="text-lg font-bold text-primary-700 cursor-pointer" onClick={() => setActiveView('dashboard')}>Sổ Sách Kế Toán</h1>
+                 <button onClick={() => setShowLanding(true)} className="p-1 text-gray-400 hover:text-primary-600 transition-colors" title="Về trang giới thiệu">
+                    <HomeIcon />
+                 </button>
             </div>
             <NavItem view="dashboard" label="Tổng Quan" icon={<ChartIcon />} />
             <NavItem view="sales" label="Bán Hàng" icon={<ShoppingCartIcon />} />
@@ -306,11 +300,22 @@ const App: React.FC = () => {
             )}
 
             <UserSelector />
+            
+            <div className="text-xs text-center text-gray-400 mt-4 border-t border-gray-200 pt-4">
+                <p className="font-bold text-gray-600">Sổ Sách Kế Toán</p>
+                <p>Lê Minh Huấn</p>
+                <p>0912.041.201</p>
+            </div>
         </aside>
 
         <div className="flex-1 md:ml-64">
             <header className="bg-white shadow-sm sticky top-0 z-10 md:hidden p-4 flex justify-between items-center">
-                 <h1 className="text-xl sm:text-2xl font-bold text-primary-700">Sổ Sách Kế Toán</h1>
+                 <div className="flex items-center gap-2">
+                     <button onClick={() => setShowLanding(true)} className="text-primary-700">
+                        <HomeIcon />
+                     </button>
+                     <h1 className="text-xl sm:text-2xl font-bold text-primary-700">Sổ Sách Kế Toán</h1>
+                 </div>
                  <div className="w-40">
                      <select
                         id="user-select-mobile"
@@ -328,6 +333,12 @@ const App: React.FC = () => {
             </header>
             <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 md:pb-8">
                 {renderContent()}
+                
+                {/* Mobile Footer Info */}
+                <div className="mt-8 py-6 text-center text-xs text-gray-400 md:hidden">
+                    <p className="font-bold text-gray-500">Sổ Sách Kế Toán</p>
+                    <p>Lê Minh Huấn - 0912.041.201</p>
+                </div>
             </main>
         </div>
       

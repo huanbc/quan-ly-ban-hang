@@ -44,7 +44,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
             </div>
           </div>
           <div className="mt-12 text-sm text-primary-200 opacity-80">
-            &copy; 2025 HTP Store Technology
+            &copy; 2025 Lê Minh Huấn Technology
           </div>
         </div>
 
@@ -60,9 +60,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
                         <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                     </div>
                  </div>
-                 <h2 className="text-2xl font-bold text-gray-800 mb-1">Hoàng Văn Phan</h2>
-                 <p className="text-primary-600 font-medium mb-4">Tác giả & Nhà phát triển</p>
-                 <div className="w-16 h-1 bg-primary-500 mx-auto rounded-full"></div>
+                 <h2 className="text-2xl font-bold text-gray-800 mb-1">Lê Minh Huấn</h2>
+                 <p className="text-primary-600 font-medium mb-1">Tác giả & Nhà phát triển</p>
+                 <p className="text-gray-500 text-sm">0912.041.201</p>
+                 <div className="w-16 h-1 bg-primary-500 mx-auto rounded-full mt-4"></div>
             </div>
 
             <div className="space-y-6 w-full max-w-xs relative z-10">
