@@ -1,11 +1,43 @@
 
-import React from 'react';
+
+
+import React, { useRef } from 'react';
+import { AppData } from '../types';
 
 interface LandingPageProps {
   onEnter: () => void;
+  onRestore?: (data: AppData) => void;
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onEnter, onRestore }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const fileReader = new FileReader();
+    if (event.target.files && event.target.files.length > 0 && onRestore) {
+         const file = event.target.files[0];
+         fileReader.readAsText(file, "UTF-8");
+         fileReader.onload = (e) => {
+             if(e.target?.result) {
+                 try {
+                     const parsedData = JSON.parse(e.target.result as string);
+                     if (parsedData && (parsedData.transactions || parsedData.customers)) {
+                         if(confirm(`Tìm thấy bản sao lưu từ ngày ${parsedData.updatedAt ? new Date(parsedData.updatedAt).toLocaleDateString('vi-VN') : 'không xác định'}. Bạn có muốn nạp dữ liệu này không?`)) {
+                             onRestore(parsedData);
+                         }
+                     } else {
+                         alert("File không hợp lệ: Không tìm thấy dữ liệu ứng dụng.");
+                     }
+                 } catch (error) {
+                     alert("Lỗi đọc file: File không đúng định dạng JSON.");
+                 }
+             }
+             // Reset input
+             if (fileInputRef.current) fileInputRef.current.value = '';
+         };
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col items-center justify-center p-4 font-sans text-gray-800">
       <div className="max-w-5xl w-full bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row">
@@ -67,15 +99,35 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
                  <div className="w-16 h-1 bg-primary-500 mx-auto rounded-full mt-4"></div>
             </div>
 
-            <div className="space-y-6 w-full max-w-xs relative z-10">
+            <div className="space-y-4 w-full max-w-xs relative z-10">
                 <button 
                     onClick={onEnter}
                     className="group w-full bg-primary-600 text-white font-bold py-4 px-6 rounded-xl shadow-lg hover:bg-primary-700 hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200 flex items-center justify-center gap-3"
                 >
-                    <span className="text-lg">Truy cập Ứng dụng</span>
+                    <span className="text-lg">Tiếp tục làm việc</span>
                     <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
                 </button>
-                <p className="text-xs text-gray-400 px-4 leading-relaxed">
+                
+                {onRestore && (
+                    <div>
+                        <input 
+                            type="file" 
+                            accept=".json" 
+                            ref={fileInputRef}
+                            onChange={handleFileChange}
+                            className="hidden" 
+                        />
+                        <button 
+                            onClick={() => fileInputRef.current?.click()}
+                            className="group w-full bg-white border-2 border-gray-100 text-gray-600 font-bold py-3 px-6 rounded-xl hover:border-primary-100 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200 flex items-center justify-center gap-2 text-sm"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                            <span>Nạp dữ liệu từ file sao lưu</span>
+                        </button>
+                    </div>
+                )}
+
+                <p className="text-xs text-gray-400 px-4 leading-relaxed mt-4">
                     Ứng dụng được tối ưu hóa cho trình duyệt Chrome và Safari. Dữ liệu được lưu trữ an toàn trên thiết bị của bạn.
                 </p>
             </div>

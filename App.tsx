@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Transaction, Customer, Product, Supplier, Employee, UserRole, BusinessDetails, AppData } from './types';
 import Dashboard from './components/Dashboard';
@@ -235,6 +237,11 @@ const App: React.FC = () => {
       if (data.businessDetails) setBusinessDetails(data.businessDetails);
       alert("Khôi phục dữ liệu thành công!");
   };
+  
+  const handleRestoreFromLanding = (data: AppData) => {
+      onRestoreData(data);
+      setShowLanding(false);
+  };
 
 
   const NavItem = ({ view, label, icon, mobile = false, onClick }: { view: View, label: string, icon: React.ReactElement, mobile?: boolean, onClick?: () => void }) => {
@@ -324,7 +331,7 @@ const App: React.FC = () => {
   }
   
   if (showLanding) {
-    return <LandingPage onEnter={() => setShowLanding(false)} />;
+    return <LandingPage onEnter={() => setShowLanding(false)} onRestore={handleRestoreFromLanding} />;
   }
 
   if (!currentUser) {
