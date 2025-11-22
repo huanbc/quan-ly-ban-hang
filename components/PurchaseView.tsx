@@ -1,13 +1,18 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Product, Supplier, Transaction, TransactionType } from '../types';
 import { TrashIcon, PlusIcon } from '../constants';
 import AddEditSupplierModal from './AddEditSupplierModal';
+import OCRPurchaseModal from './OCRPurchaseModal';
 
 interface PurchaseViewProps {
   products: Product[];
   suppliers: Supplier[];
+  transactions: Transaction[];
   onAddTransaction: (transaction: Omit<Transaction, 'id'>) => void;
   onAddSupplier: (supplier: Omit<Supplier, 'id'>, callback?: (newSupplier: Supplier) => void) => void;
+  onAddProduct: (product: Omit<Product, 'id'>, callback?: (newProduct: Product) => void) => void;
+  onUpdateProduct: (product: Product) => void;
 }
 
 interface OrderItem {
@@ -15,13 +20,22 @@ interface OrderItem {
   quantity: number;
 }
 
-const PurchaseView: React.FC<PurchaseViewProps> = ({ products, suppliers, onAddTransaction, onAddSupplier }) => {
+const PurchaseView: React.FC<PurchaseViewProps> = ({ 
+    products, 
+    suppliers, 
+    transactions, 
+    onAddTransaction, 
+    onAddSupplier, 
+    onAddProduct, 
+    onUpdateProduct 
+}) => {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank'>('cash');
 
   const [isAddSupplierModalOpen, setIsAddSupplierModalOpen] = useState(false);
+  const [isOCRModalOpen, setIsOCRModalOpen] = useState(false);
   const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
   const [isSupplierDropdownOpen, setIsSupplierDropdownOpen] = useState(false);
   const supplierSearchRef = useRef<HTMLDivElement>(null);
@@ -144,14 +158,25 @@ const PurchaseView: React.FC<PurchaseViewProps> = ({ products, suppliers, onAddT
     <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-8rem)]">
       {/* Left side - Product List */}
       <div className="flex-1 lg:w-3/5 bg-white p-4 rounded-xl shadow-lg flex flex-col">
-        <div className="mb-4">
+        <div className="mb-4 flex gap-2">
           <input
             type="text"
             placeholder="Tìm kiếm sản phẩm..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+            className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
           />
+          <button 
+            onClick={() => setIsOCRModalOpen(true)}
+            className="flex items-center space-x-2 bg-primary-100 text-primary-700 px-3 py-2 rounded-lg hover:bg-primary-200 transition-colors shadow-sm whitespace-nowrap"
+            title="Quét hóa đơn nhập hàng"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span className="hidden sm:inline font-medium">Quét hóa đơn</span>
+          </button>
         </div>
         <div className="flex-1 overflow-y-auto pr-2">
             {filteredProducts.length > 0 ? (
@@ -287,6 +312,18 @@ const PurchaseView: React.FC<PurchaseViewProps> = ({ products, suppliers, onAddT
           onClose={() => setIsAddSupplierModalOpen(false)}
           onSave={handleSaveNewSupplier}
           supplier={null}
+        />
+    )}
+    {isOCRModalOpen && (
+        <OCRPurchaseModal 
+            onClose={() => setIsOCRModalOpen(false)}
+            onAddTransaction={onAddTransaction}
+            onAddProduct={onAddProduct}
+            onUpdateProduct={onUpdateProduct}
+            onAddSupplier={onAddSupplier}
+            products={products}
+            suppliers={suppliers}
+            transactions={transactions}
         />
     )}
     </>

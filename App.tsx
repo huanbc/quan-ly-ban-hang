@@ -236,7 +236,7 @@ const App: React.FC = () => {
       case 'dashboard': return <Dashboard transactions={transactions} customers={customers} suppliers={suppliers} currentUser={currentUser} businessDetails={businessDetails} onUpdateBusinessDetails={setBusinessDetails} />;
       case 'transactions': return <TransactionList transactions={sortedTransactions} onDelete={deleteTransaction} customers={customers} suppliers={suppliers} products={products} />;
       case 'sales': return <SalesView products={products} customers={customers} onAddTransaction={addTransaction} onAddCustomer={customerOps.add} />;
-      case 'purchase': return <PurchaseView products={products} suppliers={suppliers} onAddTransaction={addTransaction} onAddSupplier={supplierOps.add} />;
+      case 'purchase': return <PurchaseView products={products} suppliers={suppliers} transactions={transactions} onAddTransaction={addTransaction} onAddSupplier={supplierOps.add} onAddProduct={productOps.add} onUpdateProduct={productOps.update} />;
       case 'customers': return <CustomerList customers={customers} transactions={transactions} onAdd={customerOps.add} onUpdate={customerOps.update} onDelete={customerOps.delete} />;
       case 'products': return <ProductList products={products} onAdd={productOps.add} onUpdate={productOps.update} onDelete={productOps.delete} onBatchAdd={productOps.batchAdd} transactions={transactions} suppliers={suppliers} />;
       case 'suppliers': return <SupplierList suppliers={suppliers} transactions={transactions} onAdd={supplierOps.add} onUpdate={supplierOps.update} onDelete={supplierOps.delete} />;
